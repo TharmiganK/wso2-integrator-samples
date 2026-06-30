@@ -1,49 +1,76 @@
-import ballerina/messaging;
 import ballerina/log;
+import ballerina/messaging;
+import ballerina/workflow;
+// Importing the management module auto-starts its HTTP API (default :8234, base path
+// /workflow), which the failed-message console consumes to list and act on tasks.
+import ballerina/workflow.management as _;
 
-# Polls the sales-order store and drives each message through processing. Transient
-# failures are retried (`maxRetries` times, `retryInterval` seconds apart) and a
-# message that still fails is moved to the dead-letter store, giving the pattern its
-# guaranteed-delivery behaviour.
+# Polls the sales-order store and drives each message through processing. Instead of
+# the listener's in-place retry / dead-letter behaviour, a message that fails to
+# process or parse is handed to a durable human-review workflow so a manager can
+# inspect and replay it from the console. The dead-letter store is written only when
+# the manager gives up on a message (see `workflow.bal`).
 listener messaging:StoreListener msgStoreListener = new (salesOrderStore, {
     pollingInterval: 10,
-    maxRetries: 2,
-    retryInterval: 2,
-    deadLetterStore: deadLetterStore
+    maxRetries: 0
 });
 
 service on msgStoreListener {
 
     # Processes a single sales order retrieved from the store.
     #
-    # On success the message is acknowledged and removed from the store. A processing
-    # error is returned so the listener retries and, once retries are exhausted, moves
-    # the message to the dead-letter store. A payload that cannot be parsed into a
-    # `SalesOrderRequest` is itself stored on the dead-letter store for later analysis.
+    # On success the message is acknowledged and removed from the store. On a parse or
+    # processing failure a durable review workflow is started — `workflow:run` persists
+    # it durably before we return — and the message is then acknowledged off the main
+    # queue, since the workflow now owns its fate.
     #
     # + payload - The raw message payload retrieved from the store
-    # + return - An error to trigger a retry / dead-letter, or `()` on success
+    # + return - An error only if the review workflow could not be started, else `()`
     isolated remote function onMessage(anydata payload) returns error? {
-        do {
-            SalesOrderRequest salesOrder = check parseSalesOrderReq(payload);
+        SalesOrderRequest|error salesOrder = parseSalesOrderReq(payload);
+        if salesOrder is error {
+            log:printError("failed to parse the sales order; starting review workflow", salesOrder);
+            string workflowId = check workflow:run(reviewFailedSalesOrderProcess, {
+                rawPayload: toRawJson(payload),
+                errorMessage: salesOrder.message(),
+                errorCode: "PARSE_ERROR"
+            });
+            log:printInfo("review workflow started for unparseable message", workflowId = workflowId);
+            return;
+        }
 
-            do {
-                log:printInfo("sales order received", orderType = salesOrder.orderType, refId = salesOrder.refId);
-                check processSalesOrder(salesOrder);
-                log:printInfo("sales order processed successfully", orderType = salesOrder.orderType, refId = salesOrder.refId);
-            } on fail error err {
-                log:printInfo("failed to procees the sales order", err);
-                // Returning error here which will trigger retry and on failure after all retries
-                // it will be stored in DLQ
-                return err;
-            }
-        } on fail error err {
-            log:printError("failed to parse the sales order and adding to DLQ", err);
+        log:printInfo("sales order received", orderType = salesOrder.orderType, refId = salesOrder.refId);
+        error? processResult = processSalesOrder(salesOrder);
+        if processResult is error {
+            log:printError("failed to process the sales order; starting review workflow", processResult,
+                    orderType = salesOrder.orderType, refId = salesOrder.refId);
+            string workflowId = check workflow:run(reviewFailedSalesOrderProcess, {
+                salesOrder: salesOrder,
+                rawPayload: salesOrder.toJson(),
+                errorMessage: processResult.message(),
+                errorCode: "PROCESSING_ERROR"
+            });
+            log:printInfo("review workflow started for failed sales order", workflowId = workflowId,
+                    refId = salesOrder.refId);
+            return;
+        }
+        log:printInfo("sales order processed successfully", orderType = salesOrder.orderType, refId = salesOrder.refId);
+    }
+}
 
-            // The message has been corruptted hence storing it in DLQ for further
-            // Analysis
-            check deadLetterStore->store(payload);
-            log:printInfo("corrupted message stored successfully");
+# Best-effort conversion of a raw store payload to readable JSON for the console.
+# Solace delivers payloads as `byte[]`; decode them to text and parse if possible so
+# the manager sees the original order rather than a byte array.
+#
+# + payload - The raw message payload
+# + return - The payload as JSON (parsed object, decoded text, or the value itself)
+isolated function toRawJson(anydata payload) returns json {
+    if payload is byte[] {
+        string|error text = string:fromBytes(payload);
+        if text is string {
+            json|error parsed = text.fromJsonString();
+            return parsed is json ? parsed : text;
         }
     }
+    return payload.toJson();
 }

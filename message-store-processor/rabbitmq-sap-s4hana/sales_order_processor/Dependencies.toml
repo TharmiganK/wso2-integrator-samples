@@ -58,6 +58,17 @@ dependencies = [
 
 [[package]]
 org = "ballerina"
+name = "email"
+version = "2.13.0"
+dependencies = [
+	{org = "ballerina", name = "jballerina.java"},
+	{org = "ballerina", name = "log"},
+	{org = "ballerina", name = "mime"},
+	{org = "ballerina", name = "task"}
+]
+
+[[package]]
+org = "ballerina"
 name = "file"
 version = "1.13.0"
 dependencies = [
@@ -99,7 +110,7 @@ dependencies = [
 [[package]]
 org = "ballerina"
 name = "io"
-version = "1.8.0"
+version = "1.8.1"
 dependencies = [
 	{org = "ballerina", name = "jballerina.java"},
 	{org = "ballerina", name = "lang.value"}
@@ -146,6 +157,14 @@ dependencies = [
 [[package]]
 org = "ballerina"
 name = "lang.decimal"
+version = "0.0.0"
+dependencies = [
+	{org = "ballerina", name = "jballerina.java"}
+]
+
+[[package]]
+org = "ballerina"
+name = "lang.error"
 version = "0.0.0"
 dependencies = [
 	{org = "ballerina", name = "jballerina.java"}
@@ -230,7 +249,7 @@ modules = [
 [[package]]
 org = "ballerina"
 name = "mime"
-version = "2.12.1"
+version = "2.12.2"
 dependencies = [
 	{org = "ballerina", name = "io"},
 	{org = "ballerina", name = "jballerina.java"},
@@ -270,12 +289,37 @@ dependencies = [
 
 [[package]]
 org = "ballerina"
+name = "soap"
+version = "2.3.1"
+dependencies = [
+	{org = "ballerina", name = "crypto"},
+	{org = "ballerina", name = "http"},
+	{org = "ballerina", name = "io"},
+	{org = "ballerina", name = "jballerina.java"},
+	{org = "ballerina", name = "lang.regexp"},
+	{org = "ballerina", name = "mime"},
+	{org = "ballerina", name = "test"},
+	{org = "ballerinai", name = "observe"}
+]
+
+[[package]]
+org = "ballerina"
 name = "task"
-version = "2.11.1"
+version = "2.11.2"
 dependencies = [
 	{org = "ballerina", name = "jballerina.java"},
 	{org = "ballerina", name = "time"},
 	{org = "ballerina", name = "uuid"}
+]
+
+[[package]]
+org = "ballerina"
+name = "test"
+version = "0.0.0"
+dependencies = [
+	{org = "ballerina", name = "jballerina.java"},
+	{org = "ballerina", name = "lang.array"},
+	{org = "ballerina", name = "lang.error"}
 ]
 
 [[package]]
@@ -303,6 +347,28 @@ dependencies = [
 	{org = "ballerina", name = "jballerina.java"},
 	{org = "ballerina", name = "lang.int"},
 	{org = "ballerina", name = "time"}
+]
+
+[[package]]
+org = "ballerina"
+name = "workflow"
+version = "0.5.0"
+dependencies = [
+	{org = "ballerina", name = "email"},
+	{org = "ballerina", name = "http"},
+	{org = "ballerina", name = "jballerina.java"},
+	{org = "ballerina", name = "lang.runtime"},
+	{org = "ballerina", name = "log"},
+	{org = "ballerina", name = "mime"},
+	{org = "ballerina", name = "soap"},
+	{org = "ballerina", name = "test"},
+	{org = "ballerina", name = "time"}
+]
+modules = [
+	{org = "ballerina", packageName = "workflow", moduleName = "workflow"},
+	{org = "ballerina", packageName = "workflow", moduleName = "workflow.activity"},
+	{org = "ballerina", packageName = "workflow", moduleName = "workflow.internal"},
+	{org = "ballerina", packageName = "workflow", moduleName = "workflow.management"}
 ]
 
 [[package]]
@@ -368,6 +434,7 @@ version = "0.1.0"
 dependencies = [
 	{org = "ballerina", name = "log"},
 	{org = "ballerina", name = "messaging"},
+	{org = "ballerina", name = "workflow"},
 	{org = "ballerinax", name = "rabbitmq"},
 	{org = "ballerinax", name = "sap.s4hana.api_sales_order_srv"}
 ]

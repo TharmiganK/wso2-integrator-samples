@@ -1,0 +1,6 @@
+# Demo user store (PLAIN TEXT — demo only, never do this in production).
+# Format:  username:password:comma,separated,roles
+# The review workflow assigns tasks to the "manager" role (see workflow.bal).
+manager:manager123:manager
+ops:ops123:manager
+admin:admin123:manager,admin

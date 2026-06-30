@@ -84,5 +84,16 @@ services:
         fi
         echo "Solace queue provisioning complete."
 
+  # Durable backend for the sales_order_processor's human-review workflows. This
+  # is the single-container Temporal dev server (in-memory, no external DB) — the
+  # processor connects to it on 7233 when run with Config.local.toml.
+  temporal:
+    image: temporalio/temporal:latest
+    container_name: demo-temporal
+    command: ["server", "start-dev", "--ip", "0.0.0.0"]
+    ports:
+      - "7233:7233"   # gRPC frontend (used by the workflow runtime in LOCAL mode)
+      - "8233:8233"   # Temporal Web UI -> http://localhost:8233
+
 volumes:
   solace-data:

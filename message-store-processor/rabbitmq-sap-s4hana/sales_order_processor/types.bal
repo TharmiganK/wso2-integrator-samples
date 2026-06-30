@@ -53,3 +53,26 @@ public type SalesOrderResponse record {|
     # Transaction currency of the created order
     string currency?;
 |};
+
+# Input handed to the human-review workflow when a sales order fails to process or
+# parse. The whole record is passed to `workflow:run` and rehydrated as the workflow
+# function's input parameter.
+public type FailedSalesOrderReview record {|
+    # The parsed sales order, or `()` when the payload could not be parsed
+    SalesOrderRequest? salesOrder = ();
+    # The original message payload, surfaced to the manager and used for replay
+    json rawPayload;
+    # The failure message shown to the reviewing manager
+    string errorMessage;
+    # Failure category: `PARSE_ERROR` (unparseable payload) or `PROCESSING_ERROR`
+    string errorCode;
+|};
+
+# Decision captured from the reviewing manager and delivered back to the workflow via
+# the management API's `completeHumanTask`. Drives the auto-generated completion form.
+public type SalesOrderReviewDecision record {|
+    # An optional corrected order to replay instead of the original payload
+    SalesOrderRequest? editedPayload = ();
+    # Optional free-text reviewer comments
+    string? comments = ();
+|};
