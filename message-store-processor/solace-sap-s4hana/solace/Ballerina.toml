@@ -1,0 +1,14 @@
+[package]
+org = "wso2"
+name = "solace"
+version = "0.1.0"
+distribution = "2201.13.4"
+title = "solace"
+
+[build-options]
+sticky = true
+
+[[dependency]]
+org = "ballerinax"
+name = "solace"
+version = "0.3.1"

@@ -1,0 +1,15 @@
+# Ballerina build artifacts
+target/
+*.jar
+
+# Ballerina dependency lock (regenerated on build)
+# Dependencies.toml is intentionally NOT ignored so samples build reproducibly.
+
+# OS / editor files
+.DS_Store
+Thumbs.db
+*.swp
+
+# Local secrets / overrides
+# (Config.toml files in the samples hold demo-only credentials and are committed
+# on purpose. Add any machine-specific overrides below.)

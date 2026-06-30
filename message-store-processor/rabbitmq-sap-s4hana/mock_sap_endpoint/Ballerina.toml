@@ -1,0 +1,9 @@
+[package]
+org = "wso2"
+name = "mock_sap_endpoint"
+version = "0.1.0"
+distribution = "2201.13.4"
+title = "Mock SAP Endpoint"
+
+[build-options]
+sticky = true

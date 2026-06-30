@@ -1,0 +1,3 @@
+[workspace]
+title = "Message Store and Processor: Solace - SAP S4HANA"
+packages = ["sales_order_store", "sales_order_processor", "mock_sap_endpoint", "solace"]

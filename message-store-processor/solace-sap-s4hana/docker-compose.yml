@@ -1,0 +1,88 @@
+services:
+  solace:
+    image: solace/solace-pubsub-standard:latest
+    container_name: demo-solace
+    hostname: demo-solace
+    shm_size: 1g
+    ulimits:
+      core: -1
+      nofile:
+        soft: 1048576
+        hard: 1048576
+    ports:
+      - "8080:8080"   # SEMP / management web UI -> http://localhost:8080 (admin/admin)
+      - "45555:55555" # SMF messaging (Solace native) - 55555 is in the macOS ephemeral range, so remap on the host
+      - "5673:5672"   # AMQP (remapped: 5672 is taken by RabbitMQ on the host)
+      - "1883:1883"   # MQTT
+      - "8008:8008"   # Web messaging
+      - "9000:9000"   # REST messaging
+    environment:
+      - username_admin_globalaccesslevel=admin
+      - username_admin_password=admin
+      - system_scaling_maxconnectioncount=100
+    volumes:
+      - solace-data:/var/lib/solace
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf -u admin:admin http://localhost:8080/SEMP/v2/config/about >/dev/null || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 60s
+
+  # Provisions the same queues on Solace as RabbitMQ, then exits. Runs once the
+  # broker is healthy, so both brokers expose an identical set of message stores.
+  solace-init:
+    image: curlimages/curl:latest
+    container_name: demo-solace-init
+    depends_on:
+      solace:
+        condition: service_healthy
+    entrypoint:
+      - sh
+      - -c
+      - |
+        set -eu
+        SEMP="http://solace:8080/SEMP/v2/config/msgVpns/default/queues"
+
+        provision() {
+          q="$$1"
+          attempt=1
+          max=30
+          while :; do
+            code=$$(curl -s -u admin:admin -o /tmp/resp.json -w "%{http_code}" \
+              -X POST "$$SEMP" \
+              -H "Content-Type: application/json" \
+              -d "{\"queueName\":\"$$q\",\"accessType\":\"non-exclusive\",\"permission\":\"consume\",\"ingressEnabled\":true,\"egressEnabled\":true}")
+            case "$$code" in
+              200|201)
+                echo "  [$$q] created (HTTP $$code)"
+                return 0 ;;
+            esac
+            if grep -q 'ALREADY_EXISTS' /tmp/resp.json 2>/dev/null; then
+              echo "  [$$q] already exists - ok"
+              return 0
+            fi
+            if [ "$$attempt" -ge "$$max" ]; then
+              echo "  [$$q] FAILED after $$max attempts (HTTP $$code):"
+              cat /tmp/resp.json
+              return 1
+            fi
+            echo "  [$$q] attempt $$attempt failed (HTTP $$code), retrying in 2s..."
+            attempt=$$((attempt + 1))
+            sleep 2
+          done
+        }
+
+        rc=0
+        for q in sales-orders sales-orders-dlq sales-orders-res; do
+          echo "Provisioning Solace queue: $$q"
+          provision "$$q" || rc=1
+        done
+        if [ "$$rc" -ne 0 ]; then
+          echo "Solace queue provisioning FAILED." >&2
+          exit 1
+        fi
+        echo "Solace queue provisioning complete."
+
+volumes:
+  solace-data:
