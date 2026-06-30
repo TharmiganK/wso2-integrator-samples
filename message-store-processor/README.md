@@ -50,4 +50,8 @@ The **[`failed-message-console`](./failed-message-console)** is shared by both s
 | `5173` | Failed Sales Order Console (Vite) |
 | `3001` | Console BFF (Express) |
 
+## Replaying dead-lettered orders
+
+Orders that end up on the `sales-orders-dlq` queue can be replayed back onto `sales-orders` **from the broker itself**, with no application code — the broker re-injects the message verbatim and `sales_order_processor` reprocesses it. See **[replaying-dead-lettered-orders.md](./replaying-dead-lettered-orders.md)** for the step-by-step runbook: the RabbitMQ Management UI (Shovel, or manual Get + Publish) and the Solace `copy-message` command (with the [`solace-sap-s4hana/replay-from-dlq.py`](./solace-sap-s4hana/replay-from-dlq.py) helper). The runbook also covers the feasibility of editing a message while replaying.
+
 Pick the sample that matches your broker and follow its README — each is self-contained with full setup and run instructions.

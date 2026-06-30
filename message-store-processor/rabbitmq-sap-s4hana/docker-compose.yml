@@ -12,6 +12,10 @@ services:
     volumes:
       - ./rabbitmq/rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf:ro
       - ./rabbitmq/definitions.json:/etc/rabbitmq/definitions.json:ro
+      # Enables the management UI plus the Shovel + Shovel Management plugins, so a
+      # dead-lettered order can be replayed onto the source queue straight from the
+      # web console (Admin -> Shovel Management). See ../replaying-dead-lettered-orders.md
+      - ./rabbitmq/enabled_plugins:/etc/rabbitmq/enabled_plugins:ro
       - rabbitmq-data:/var/lib/rabbitmq
     healthcheck:
       test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
