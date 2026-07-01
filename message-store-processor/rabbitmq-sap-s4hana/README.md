@@ -162,6 +162,17 @@ You get back `202 Accepted` as soon as the order is stored. Watch the `sales_ord
 
 To watch the guaranteed-delivery behaviour clearly, set `failurePercentage = 100` in `mock_sap_endpoint/Config.toml` and restart the mock: every order is retried twice and then ends up on `sales-orders-dlq`. You can inspect all three queues and their message counts in the [RabbitMQ management UI](http://localhost:15672).
 
+## Replaying dead-lettered orders
+
+Once the root cause is fixed (e.g. set `failurePercentage = 0` and restart the mock), the orders sitting on `sales-orders-dlq` can be replayed back onto `sales-orders` **from the broker itself**, with no application change — `sales_order_processor` then reprocesses them normally.
+
+Everything is done from the [RabbitMQ management UI](http://localhost:15672):
+
+- **Shovel (recommended)** — **Admin** → **Shovel Management** → **Add a new shovel**: source queue `sales-orders-dlq`, destination queue `sales-orders`, **Delete after** `Queue length` so it drains the current backlog once and removes itself. The `rabbitmq_shovel`/`rabbitmq_shovel_management` plugins are already enabled by this sample's `docker-compose.yml`.
+- **Manual Get + Publish** — for replaying (or **editing**) one message at a time: **Get messages** on `sales-orders-dlq` with Ack Mode `Reject requeue true`, copy the payload, **Publish message** to `sales-orders`, then remove the original. Publish the replay *before* removing the original so a mistake never loses the order.
+
+See the [DLQ replay runbook](../replaying-dead-lettered-orders.md) for the full walkthrough (CLI equivalents, editing-while-replaying feasibility) and the Solace equivalent.
+
 ## Observability with Datadog
 
 The two integration services publish **metrics** (Prometheus) and **distributed traces**

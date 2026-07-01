@@ -30,7 +30,7 @@ Both samples expose the same HTTP API (`POST /api/sales-order` on port `9091`) a
 
 ## Replaying dead-lettered orders
 
-Orders that end up on the `sales-orders-dlq` queue can be replayed back onto `sales-orders` **from the broker itself**, with no application code — the broker re-injects the message verbatim and `sales_order_processor` reprocesses it. See **[replaying-dead-lettered-orders.md](./replaying-dead-lettered-orders.md)** for the step-by-step runbook: the RabbitMQ Management UI (Shovel, or manual Get + Publish) and the Solace `copy-message` command (with the [`solace-sap-s4hana/replay-from-dlq.py`](./solace-sap-s4hana/replay-from-dlq.py) helper). The runbook also covers the feasibility of editing a message while replaying.
+Orders that end up on the `sales-orders-dlq` queue can be replayed back onto `sales-orders` **from the broker itself**, with no application code — the broker re-injects the message verbatim and `sales_order_processor` reprocesses it. See **[replaying-dead-lettered-orders.md](./replaying-dead-lettered-orders.md)** for the step-by-step runbook: the RabbitMQ Management UI (Shovel, or manual Get + Publish) and, on Solace, the [`solace-msg-utility`](https://github.com/SolaceLabs/solace-msg-utility) web UI (Queue Copy) that ships with `solace-sap-s4hana/docker-compose.yml`, or the broker's `copy-message` CLI as a fallback. The runbook also covers the feasibility of editing a message while replaying.
 
 ## Observability
 

@@ -84,6 +84,67 @@ services:
         fi
         echo "Solace queue provisioning complete."
 
+  # Browser UI for browsing/copying/moving queued messages (e.g. replaying
+  # sales-orders-dlq back onto sales-orders) without the broker CLI.
+  # https://github.com/SolaceLabs/solace-msg-utility
+  #
+  # The published image ships the app HTML but NOT its two vendor scripts
+  # (the Solace Web Messaging SDK cannot be redistributed inside the image),
+  # so this init job downloads them into a volume that the app mounts next to
+  # index.html (see the app service below). Without them the UI loads but every
+  # Connect fails with "solclient.js not found".
+  solace-msg-utility-init:
+    image: curlimages/curl:latest
+    container_name: demo-solace-msg-utility-init
+    user: "0:0"   # write into the fresh named volume (curl's default UID 100 cannot); files land world-readable for the app's UID 65532
+    entrypoint:
+      - sh
+      - -c
+      - |
+        set -eu
+        echo "Downloading solclient.js (Solace Web Messaging SDK, browser build) ..."
+        curl -fsSL -o /vendor/solclient.js \
+          "https://cdn.jsdelivr.net/npm/solclientjs@10.18.3/lib-browser/solclient.js"
+        echo "Downloading jszip.min.js ..."
+        curl -fsSL -o /vendor/jszip.min.js \
+          "https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"
+        echo "Vendor scripts ready."
+    volumes:
+      - solace-msg-utility-vendor:/vendor
+
+  solace-msg-utility:
+    image: ghcr.io/solacelabs/solace-msg-utility:latest
+    container_name: demo-solace-msg-utility
+    depends_on:
+      solace:
+        condition: service_healthy
+      solace-msg-utility-init:
+        condition: service_completed_successfully
+    ports:
+      - "9444:9443"   # UI -> https://localhost:9444 (self-signed cert; container listens on 9443, remapped since 9443 is commonly already bound on the host, e.g. by Rancher Desktop)
+    environment:
+      - HOSTED=true
+    volumes:
+      - solace-msg-utility-tls:/tls
+      # Supply the two vendor scripts the app HTML loads, placed NEXT TO index.html
+      # (same dir), not under js/. The app's bootstrap latches onto the first
+      # `solclient` <script> tag (src="solclient.js", same-dir) and only starts its
+      # modules on that tag's `load`; if solclient.js loads only from the js/ fallback
+      # the modules never render (empty sidebar). Individual-file subpath mounts keep
+      # the image's baked index.html intact.
+      - type: volume
+        source: solace-msg-utility-vendor
+        target: /SolaceMsgUtility/solclient.js
+        read_only: true
+        volume:
+          subpath: solclient.js
+      - type: volume
+        source: solace-msg-utility-vendor
+        target: /SolaceMsgUtility/jszip.min.js
+        read_only: true
+        volume:
+          subpath: jszip.min.js
+
   # Datadog Agent for observability. Opt-in via the "observability" profile so the
   # default `docker compose up -d` starts only the broker:
   #   docker compose --profile observability up -d
@@ -124,3 +185,5 @@ services:
 
 volumes:
   solace-data:
+  solace-msg-utility-tls:
+  solace-msg-utility-vendor:

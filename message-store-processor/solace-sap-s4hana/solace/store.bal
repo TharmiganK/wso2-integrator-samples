@@ -81,7 +81,7 @@ public isolated client class MessageStore {
     # + payload - The message payload to be stored
     # + return - An error if the message could not be stored, or `()`
     isolated remote function store(anydata payload) returns error? {
-        error? result = self.producer->send({payload});
+        error? result = self.producer->send({payload: payload.toJsonString().toBytes()});
         if result is error {
             return error("Failed to store message in Solace", cause = result);
         }
