@@ -1,6 +1,11 @@
 import ballerina/messaging;
 import ballerina/log;
 
+// Observability: expose Prometheus metrics on /metrics and push OpenTelemetry
+// traces to the Datadog Agent's OTLP receiver. See ../datadog and Config.toml.
+import ballerinax/prometheus as _;
+import ballerinax/jaeger as _;
+
 # Polls the sales-order store and drives each message through processing. Transient
 # failures are retried (`maxRetries` times, `retryInterval` seconds apart) and a
 # message that still fails is moved to the dead-letter store, giving the pattern its

@@ -13,3 +13,12 @@ Thumbs.db
 # Local secrets / overrides
 # (Config.toml files in the samples hold demo-only credentials and are committed
 # on purpose. Add any machine-specific overrides below.)
+
+# Datadog API key for the docker-compose observability profile.
+# Committed as datadog/.env.example; the real key goes in datadog/.env (or .env).
+.env
+
+# Ballerina log files shipped to Datadog (the logs/ dir itself is kept via .gitkeep).
+# `**/` so it matches the nested per-sample logs/ dirs, not just a repo-root one.
+**/logs/*.log
+
