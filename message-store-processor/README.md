@@ -34,9 +34,10 @@ Orders that end up on the `sales-orders-dlq` queue can be replayed back onto `sa
 
 ## Observability
 
-Both samples can publish metrics (Prometheus), distributed traces (OpenTelemetry) and
-JSON logs to [Datadog](https://www.datadoghq.com/) via a Docker-based Datadog Agent that
-runs alongside the broker (behind an opt-in `observability` Compose profile). See the
-**Observability with Datadog** section in each sample's README for setup.
+Both samples publish metrics (Prometheus), distributed traces (OpenTelemetry) and JSON
+logs to [Datadog](https://www.datadoghq.com/) via a Docker-based Datadog Agent that runs
+alongside the broker. Observability is enabled by default, so each sample requires a Datadog
+API key — see the **Prerequisites** and **Viewing telemetry in Datadog** sections in its
+README.
 
 Pick the sample that matches your broker and follow its README — each is self-contained with full setup and run instructions.
