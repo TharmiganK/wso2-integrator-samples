@@ -84,5 +84,22 @@ services:
         fi
         echo "Solace queue provisioning complete."
 
+  # Browser UI for browsing/copying/moving queued messages (e.g. replaying
+  # sales-orders-dlq back onto sales-orders) without the broker CLI.
+  # https://github.com/SolaceLabs/solace-msg-utility
+  solace-msg-utility:
+    image: ghcr.io/solacelabs/solace-msg-utility:latest
+    container_name: demo-solace-msg-utility
+    depends_on:
+      solace:
+        condition: service_healthy
+    ports:
+      - "9444:9443"   # UI -> https://localhost:9444 (self-signed cert; container listens on 9443, remapped since 9443 is commonly already bound on the host, e.g. by Rancher Desktop)
+    environment:
+      - HOSTED=true
+    volumes:
+      - solace-msg-utility-tls:/tls
+
 volumes:
   solace-data:
+  solace-msg-utility-tls:
