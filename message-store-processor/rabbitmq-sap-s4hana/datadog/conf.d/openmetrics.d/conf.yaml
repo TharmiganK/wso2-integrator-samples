@@ -1,6 +1,7 @@
-# Datadog OpenMetrics/Prometheus check.
-# Mounted into the Agent container at /etc/datadog-agent/conf.d/prometheus.d/conf.yaml
-# by ../docker-compose.yml. The Agent scrapes the two Ballerina services that run on
+# Datadog OpenMetrics check.
+# The whole datadog/conf.d dir is mounted into the Agent container at
+# /etc/datadog-agent/conf.d by ../docker-compose.yml, so this file lands at
+# /etc/datadog-agent/conf.d/openmetrics.d/conf.yaml. The Agent scrapes the two Ballerina services that run on
 # the host (via `bal run`); host.docker.internal resolves to the Docker host.
 #
 # Ports must match [ballerinax.prometheus].port in each package's Config.toml:
