@@ -101,7 +101,7 @@ Note the SMF port `45555`: the Solace default is `55555`, but that falls inside 
 docker compose up -d
 ```
 
-This starts Solace PubSub+, runs a one-shot `solace-init` container that provisions the `sales-orders`, `sales-orders-dlq` and `sales-orders-res` queues via the SEMP API once the broker is healthy, and starts the [`solace-msg-utility`](https://github.com/SolaceLabs/solace-msg-utility) browser UI for browsing/copying/moving queued messages. The SEMP management UI is at [http://localhost:8080](http://localhost:8080) (`admin`/`admin`); the message utility UI is at [https://localhost:9444](https://localhost:9444) (self-signed cert). The broker can take up to a minute to become healthy on first start.
+This starts Solace PubSub+, runs a one-shot `solace-init` container that provisions the `sales-orders`, `sales-orders-dlq` and `sales-orders-res` queues via the SEMP API once the broker is healthy, and starts the [`solace-msg-utility`](https://github.com/SolaceLabs/solace-msg-utility) browser UI for browsing/copying/moving queued messages (a one-shot `solace-msg-utility-init` job first downloads the UI's `solclient.js`/`jszip.min.js` vendor scripts, which the published image does not bundle). The SEMP management UI is at [http://localhost:8080](http://localhost:8080) (`admin`/`admin`); the message utility UI is at [https://localhost:9444](https://localhost:9444) (self-signed cert — accept the browser warning). The broker can take up to a minute to become healthy on first start. See [replaying dead-lettered orders](../replaying-dead-lettered-orders.md) for using the UI to replay the DLQ.
 
 **2. Start the mock SAP endpoint.** In a new terminal:
 

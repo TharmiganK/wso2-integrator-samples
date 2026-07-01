@@ -55,12 +55,14 @@ Pure built-in UI, no plugin — and this is where you can **edit** a message bef
 
 Solace PubSub+ **Broker Manager (http://localhost:8080) does not browse, copy, or move spooled messages** — its only message tool is *Try Me!*, which publishes to a topic (and `sales-orders` has no topic subscription, since the store writes straight to the queue). So the broker-side replay path on Solace needs a tool that can browse and move queued messages over SEMP/SMF.
 
-This sample's `docker-compose.yml` runs [SolaceLabs' `solace-msg-utility`](https://github.com/SolaceLabs/solace-msg-utility) — a browser-based Queue Browser / Queue Copy tool — as the `solace-msg-utility` service, so replaying never needs the broker CLI:
+This sample's `docker-compose.yml` runs [SolaceLabs' `solace-msg-utility`](https://github.com/SolaceLabs/solace-msg-utility) — a browser-based Queue Browser / Queue Copy tool — as the `solace-msg-utility` service, so replaying never needs the broker CLI. (A companion `solace-msg-utility-init` job downloads the tool's two vendor scripts, `solclient.js` and `jszip.min.js`, on first `docker compose up` — the published image ships without them, so this must complete before the UI can connect. It runs automatically; you only notice it on a cold start.)
 
 ### Recommended — Queue Copy
 
-1. Open **https://localhost:9444** (self-signed cert — accept the browser warning).
-2. **Connections**: Broker Host `solace`, SMF port `8008`, SEMP port `8080`, VPN `default`, user `admin` / `admin` → **Connect**. (`solace` resolves because the UI runs on the same Docker network as the broker.)
+1. Open **https://localhost:9444**. The gateway uses a self-signed certificate, so accept the browser's "not secure" warning (**Proceed anyway**) — expected, not a misconfiguration.
+2. **Connections** — the container reverse-proxies to the broker, so use the broker's Docker network alias and its **plaintext** ports:
+   - Broker Host `solace`, SMF port `8008` (**TLS off**), SEMP host `solace` port `8080` (**TLS off**), VPN `default`, user `admin` / `admin` → **Connect**.
+   - `solace` resolves because the gateway runs on the same Docker network as the broker. TLS must stay off for both: the broker's exposed SEMP/SMF ports are plaintext — the gateway supplies the HTTPS the browser sees.
 3. Open **Queue Copy**: Source Queue `sales-orders-dlq`, Destination Queue `sales-orders`, mode **Move** (clears the DLQ once every message lands) or **Copy** (keeps an audit copy on the DLQ).
 4. Review the **Confirm Queue Copy** pre-flight summary (message count, size, destination quota) and click **Copy**/**Move**.
 
