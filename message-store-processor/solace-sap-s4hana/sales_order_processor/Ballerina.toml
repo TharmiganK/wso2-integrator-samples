@@ -7,3 +7,4 @@ title = "Sales Order Processor"
 
 [build-options]
 sticky = true
+remoteManagement = true

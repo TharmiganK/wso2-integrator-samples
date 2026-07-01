@@ -32,4 +32,11 @@ Both samples expose the same HTTP API (`POST /api/sales-order` on port `9091`) a
 
 Orders that end up on the `sales-orders-dlq` queue can be replayed back onto `sales-orders` **from the broker itself**, with no application code — the broker re-injects the message verbatim and `sales_order_processor` reprocesses it. See **[replaying-dead-lettered-orders.md](./replaying-dead-lettered-orders.md)** for the step-by-step runbook: the RabbitMQ Management UI (Shovel, or manual Get + Publish) and the Solace `copy-message` command (with the [`solace-sap-s4hana/replay-from-dlq.py`](./solace-sap-s4hana/replay-from-dlq.py) helper). The runbook also covers the feasibility of editing a message while replaying.
 
+## Observability
+
+Both samples can publish metrics (Prometheus) and distributed traces (OpenTelemetry) to
+[Datadog](https://www.datadoghq.com/) via a Docker-based Datadog Agent that runs
+alongside the broker (behind an opt-in `observability` Compose profile). See the
+**Observability with Datadog** section in each sample's README for setup.
+
 Pick the sample that matches your broker and follow its README — each is self-contained with full setup and run instructions.

@@ -160,10 +160,99 @@ You get back `202 Accepted` as soon as the order is stored. Watch the `sales_ord
 
 To watch the guaranteed-delivery behaviour clearly, set `failurePercentage = 100` in `mock_sap_endpoint/Config.toml` and restart the mock: every order is retried twice and then ends up on `sales-orders-dlq`. You can inspect all three queues and their message counts under **Queues** in the [Solace SEMP UI](http://localhost:8080).
 
+## Observability with Datadog
+
+The two integration services publish **metrics** (Prometheus) and **distributed traces**
+(OpenTelemetry) that can be viewed in [Datadog](https://www.datadoghq.com/). A Datadog
+Agent runs in Docker alongside the broker: it **scrapes** the services' `/metrics`
+endpoints and receives **OTLP traces** the services push to it.
+
+```
+  sales_order_store (host :9797 /metrics) ─┐  scrape
+  sales_order_processor (host :9798 /metrics) ─┴──────▶ Datadog Agent ──▶ Datadog
+  sales_order_store / processor  ──OTLP gRPC push──▶  (localhost:4317)
+```
+
+| Service | Metrics endpoint | Traces |
+|---|---|---|
+| `sales_order_store` | `http://localhost:9797/metrics` | → Agent `localhost:4317` (OTLP/gRPC) |
+| `sales_order_processor` | `http://localhost:9798/metrics` | → Agent `localhost:4317` (OTLP/gRPC) |
+
+The extensions are imported in each `main.bal` and `remoteManagement = true` is set in
+each `Ballerina.toml` — both committed. The runtime toggle lives in each package's
+`Config.toml`, which is **git-ignored** (it holds local dev config), so add the block
+below to your local `Config.toml` if it isn't already there — using **port `9797` for
+`sales_order_store`** and **`9798` for `sales_order_processor`** so the two `/metrics`
+endpoints don't collide:
+
+```toml
+[ballerina.observe]
+tracingEnabled = true
+tracingProvider = "jaeger"
+metricsEnabled = true
+metricsReporter = "prometheus"
+
+[ballerinax.prometheus]
+port = 9797            # sales_order_store; use 9798 for sales_order_processor
+host = "0.0.0.0"       # bind all interfaces so the Dockerised Agent can scrape via host.docker.internal
+
+[ballerinax.jaeger]
+agentHostname = "localhost"   # the Agent's OTLP port is published to the host
+agentPort = 4317
+samplerType = "const"
+samplerParam = 1.0
+reporterFlushInterval = 2000
+reporterBufferSize = 1000
+```
+
+**Prerequisites**
+
+- A [Datadog account](https://www.datadoghq.com/) and an API key
+  (**Organization Settings → API Keys**).
+- Add the **Prometheus** integration to your Datadog account (Integrations tab).
+
+**1. Provide your API key.** From this directory:
+
+```bash
+cp datadog/.env.example .env
+# edit .env and set DD_API_KEY=<your-key>
+```
+
+`.env` is gitignored. `DD_SITE` defaults to `datadoghq.com`; change it in
+`docker-compose.yml` if your account is on another site (e.g. `datadoghq.eu`).
+
+**2. Start the broker together with the Datadog Agent.** The Agent is behind an
+`observability` Compose profile, so enable it explicitly:
+
+```bash
+docker compose --profile observability up -d
+```
+
+(Without the profile, `docker compose up -d` still starts just the broker and its
+queue-provisioning init container.) Verify the Agent picked up the Prometheus check and
+OTLP receiver:
+
+```bash
+docker exec demo-datadog-agent agent status | grep -A5 -iE "prometheus|otlp|apm"
+```
+
+**3. Run the services** as in [Running the sample](#running-the-sample) and send a few
+orders. The Agent scrapes host ports `9797`/`9798` (via `host.docker.internal`) and the
+services push traces to `localhost:4317`.
+
+**4. View in Datadog.**
+
+- **Metrics** → *Metrics Explorer*: search for `ballerina.*`. Ballerina ships a ready-made
+  dashboard you can import under *Dashboards → New → Import*:
+  [`ballerina_metrics_dashboard.json`](https://raw.githubusercontent.com/ballerina-platform/module-ballerinax-prometheus/refs/heads/main/metrics-dashboards/datadog/ballerina_metrics_dashboard.json).
+- **APM → Traces**: filter by service (`sales_order_store`, `sales_order_processor`) to
+  inspect spans and tags.
+
 ## Cleaning up
 
 ```bash
-docker compose down -v
+docker compose --profile observability down -v
 ```
 
-The `-v` flag also removes the broker's data volume so the next run starts from a clean state.
+The `-v` flag also removes the broker's data volume so the next run starts from a clean
+state. (Omit `--profile observability` if you started the broker without the Agent.)

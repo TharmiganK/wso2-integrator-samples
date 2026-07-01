@@ -1,6 +1,11 @@
 import ballerina/http;
 import ballerina/log;
 
+// Observability: expose Prometheus metrics on /metrics and push OpenTelemetry
+// traces to the Datadog Agent's OTLP receiver. See ../datadog and Config.toml.
+import ballerinax/prometheus as _;
+import ballerinax/jaeger as _;
+
 # HTTP API that accepts sales orders and hands them to the message store for
 # asynchronous, guaranteed processing. This is the entry point of the integration:
 # it does not call SAP S/4HANA directly, it only durably stores the order.

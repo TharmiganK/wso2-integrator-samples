@@ -1,0 +1,28 @@
+# Datadog OpenMetrics/Prometheus check.
+# Mounted into the Agent container at /etc/datadog-agent/conf.d/prometheus.d/conf.yaml
+# by ../docker-compose.yml. The Agent scrapes the two Ballerina services that run on
+# the host (via `bal run`); host.docker.internal resolves to the Docker host.
+#
+# Ports must match [ballerinax.prometheus].port in each package's Config.toml:
+#   sales_order_store     -> 9797
+#   sales_order_processor -> 9798
+init_config:
+
+instances:
+  - prometheus_url: http://host.docker.internal:9797/metrics
+    namespace: ballerina
+    metrics:
+      - "*"
+    tags:
+      - "service:sales_order_store"
+    headers:
+      Accept: "text/plain; version=0.0.4"
+
+  - prometheus_url: http://host.docker.internal:9798/metrics
+    namespace: ballerina
+    metrics:
+      - "*"
+    tags:
+      - "service:sales_order_processor"
+    headers:
+      Accept: "text/plain; version=0.0.4"

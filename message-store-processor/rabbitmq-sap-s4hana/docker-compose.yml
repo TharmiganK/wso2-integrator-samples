@@ -23,5 +23,38 @@ services:
       timeout: 10s
       retries: 5
 
+  # Datadog Agent for observability. Opt-in via the "observability" profile so the
+  # default `docker compose up -d` starts only the broker:
+  #   docker compose --profile observability up -d
+  # Requires DD_API_KEY (see datadog/.env.example -> copy to .env).
+  #
+  # Metrics: the Agent SCRAPES the Ballerina services running on the host
+  #   (sales_order_store :9797, sales_order_processor :9798) via host.docker.internal,
+  #   configured in datadog/conf.d/prometheus.d/conf.yaml.
+  # Traces:  the Ballerina services PUSH OTLP/gRPC spans to the Agent on localhost:4317
+  #   (published below). See ../replaying... and each package's Config.toml.
+  datadog-agent:
+    image: gcr.io/datadoghq/agent:7
+    container_name: demo-datadog-agent
+    profiles: ["observability"]
+    environment:
+      # Set DD_API_KEY in .env (copy datadog/.env.example). Left optional so the default
+      # `docker compose up -d` (broker only, no observability profile) works without a key;
+      # when the profile is enabled the Agent needs a real key or it will log an auth error.
+      - DD_API_KEY=${DD_API_KEY:-}
+      - DD_SITE=datadoghq.com
+      - DD_ENV=dev
+      - DD_APM_ENABLED=true
+      - DD_APM_NON_LOCAL_TRAFFIC=true
+      - DD_OTLP_CONFIG_RECEIVER_PROTOCOLS_GRPC_ENDPOINT=0.0.0.0:4317
+    ports:
+      - "4317:4317"   # OTLP gRPC (Ballerina jaeger/OpenTelemetry exporter pushes here)
+      - "8126:8126"   # APM / trace intake
+    extra_hosts:
+      - "host.docker.internal:host-gateway"   # lets the Agent reach host services (Linux); no-op on Docker Desktop
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./datadog/conf.d/prometheus.d/conf.yaml:/etc/datadog-agent/conf.d/prometheus.d/conf.yaml:ro
+
 volumes:
   rabbitmq-data:
