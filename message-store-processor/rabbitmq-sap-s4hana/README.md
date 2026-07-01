@@ -222,7 +222,7 @@ reporterBufferSize = 1000
 
 - A [Datadog account](https://www.datadoghq.com/) and an API key
   (**Organization Settings → API Keys**).
-- Add the **Prometheus** integration to your Datadog account (Integrations tab).
+- Add the **OpenMetrics** integration to your Datadog account (Integrations tab).
 
 **1. Provide your API key.** From this directory:
 
@@ -242,10 +242,10 @@ docker compose --profile observability up -d
 ```
 
 (Without the profile, `docker compose up -d` still starts just the broker.) Verify the
-Agent picked up the Prometheus check and OTLP receiver:
+Agent picked up the OpenMetrics check and OTLP receiver:
 
 ```bash
-docker exec demo-datadog-agent agent status | grep -A5 -iE "prometheus|otlp|apm"
+docker exec demo-datadog-agent agent status | grep -A5 -iE "openmetrics|otlp|apm"
 ```
 
 **3. Run the services** as in [Running the sample](#running-the-sample) and send a few
