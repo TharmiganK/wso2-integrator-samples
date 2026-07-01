@@ -1,0 +1,48 @@
+# Datadog OpenMetrics/Prometheus check.
+# Mounted into the Agent container at /etc/datadog-agent/conf.d/prometheus.d/conf.yaml
+# by ../docker-compose.yml. The Agent scrapes the two Ballerina services that run on
+# the host (via `bal run`); host.docker.internal resolves to the Docker host.
+#
+# Ports must match [ballerinax.prometheus].port in each package's Config.toml:
+#   sales_order_store     -> 9797
+#   sales_order_processor -> 9798
+init_config:
+
+instances:
+  - openmetrics_endpoint: http://host.docker.internal:9797/metrics
+    namespace: ballerina
+    metrics:
+      - response_time_seconds_value
+      - response_time_seconds_max
+      - response_time_seconds_min
+      - response_time_seconds_mean
+      - response_time_seconds_stdDev
+      - response_time_seconds
+      - response_time_nanoseconds_total_value
+      - requests_total_value
+      - response_errors_total_value
+      - inprogress_requests_value
+      - kafka_publishers_value
+      - kafka_consumers_value
+      - kafka_errors_value
+    headers:
+      Accept: "text/plain; version=0.0.4"
+
+  - openmetrics_endpoint: http://host.docker.internal:9798/metrics
+    namespace: ballerina
+    metrics:
+      - response_time_seconds_value
+      - response_time_seconds_max
+      - response_time_seconds_min
+      - response_time_seconds_mean
+      - response_time_seconds_stdDev
+      - response_time_seconds
+      - response_time_nanoseconds_total_value
+      - requests_total_value
+      - response_errors_total_value
+      - inprogress_requests_value
+      - kafka_publishers_value
+      - kafka_consumers_value
+      - kafka_errors_value
+    headers:
+      Accept: "text/plain; version=0.0.4"

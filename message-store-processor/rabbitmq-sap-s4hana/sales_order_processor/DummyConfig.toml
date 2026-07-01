@@ -38,3 +38,31 @@ port = 5672
 username = "guest"
 password = "guest"
 virtualHost = "/"
+
+[ballerina.observe]
+tracingEnabled = true
+tracingProvider = "jaeger"
+metricsEnabled = true
+metricsReporter = "prometheus"
+
+[ballerinax.prometheus]
+port = 9798
+host = "0.0.0.0"
+
+[ballerinax.jaeger]
+agentHostname = "localhost"
+agentPort = 4317
+samplerType = "const"
+samplerParam = 1.0
+reporterFlushInterval = 2000
+reporterBufferSize = 1000
+
+[ballerina.log]
+format = "json"
+keyValues = { service = "sales_order_processor", env = "dev" }
+
+[[ballerina.log.destinations]]
+type = "stdout"
+
+[[ballerina.log.destinations]]
+path = "../logs/sales_order_processor.log"

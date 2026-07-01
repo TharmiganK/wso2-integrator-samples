@@ -7,11 +7,11 @@
 # APM service name so logs and traces correlate; `source: ballerina` drives log parsing.
 logs:
   - type: file
-    path: /var/log/ballerina/sales_order_store.log
+    path: /logs/sales_order_store.log
     service: sales_order_store
     source: ballerina
 
   - type: file
-    path: /var/log/ballerina/sales_order_processor.log
+    path: /logs/sales_order_processor.log
     service: sales_order_processor
     source: ballerina

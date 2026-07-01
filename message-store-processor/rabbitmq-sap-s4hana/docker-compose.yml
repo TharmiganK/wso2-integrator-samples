@@ -34,32 +34,30 @@ services:
   # Traces:  the Ballerina services PUSH OTLP/gRPC spans to the Agent on localhost:4317
   #   (published below). See ../replaying... and each package's Config.toml.
   datadog-agent:
-    image: gcr.io/datadoghq/agent:7
+    image: gcr.io/datadoghq/agent:latest
     container_name: demo-datadog-agent
     profiles: ["observability"]
     environment:
-      # Set DD_API_KEY in .env (copy datadog/.env.example). Left optional so the default
-      # `docker compose up -d` (broker only, no observability profile) works without a key;
-      # when the profile is enabled the Agent needs a real key or it will log an auth error.
-      - DD_API_KEY=${DD_API_KEY:-}
-      - DD_SITE=datadoghq.com
-      - DD_ENV=dev
-      - DD_APM_ENABLED=true
-      - DD_APM_NON_LOCAL_TRAFFIC=true
+      - DD_API_KEY=${DD_API_KEY}
+      - DD_SITE=${DD_SITE}
+      # Required: agent cannot auto-detect hostname inside a container on macOS
+      - DD_HOSTNAME=rabbitmq-sap-s4hana-dev
+      # Enable OTLP ingest — receives traces from the Ballerina Jaeger connector on port 4317
       - DD_OTLP_CONFIG_RECEIVER_PROTOCOLS_GRPC_ENDPOINT=0.0.0.0:4317
+      - DD_OTLP_CONFIG_RECEIVER_PROTOCOLS_HTTP_ENDPOINT=0.0.0.0:4318
+      # Tag all telemetry with the service name
+      - DD_ENV=dev
+      - DD_SERVICE=${DD_SERVICE}
+      - DD_VERSION=0.1.0
       - DD_LOGS_ENABLED=true
+      - DD_LOGS_CONFIG_CONTAINER_COLLECT_ALL=false
     ports:
-      - "4317:4317"   # OTLP gRPC (Ballerina jaeger/OpenTelemetry exporter pushes here)
-      - "8126:8126"   # APM / trace intake
-    extra_hosts:
-      - "host.docker.internal:host-gateway"   # lets the Agent reach host services (Linux); no-op on Docker Desktop
+      - "4317:4317"   # OTLP gRPC (traces)
+      - "4318:4318"   # OTLP HTTP (optional)
+      - "8125:8125/udp"  # StatsD (optional)
     volumes:
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-      - ./datadog/conf.d/prometheus.d/conf.yaml:/etc/datadog-agent/conf.d/prometheus.d/conf.yaml:ro
-      # Log tailing: the host `logs/` dir (where the Ballerina services write JSON logs)
-      # is mounted read-only, and the file log source tells the Agent what to tail.
-      - ./logs:/var/log/ballerina:ro
-      - ./datadog/conf.d/ballerina.d/conf.yaml:/etc/datadog-agent/conf.d/ballerina.d/conf.yaml:ro
+      - ./datadog/conf.d:/etc/datadog-agent/conf.d:ro
+      - ./logs:/logs:ro
 
 volumes:
   rabbitmq-data:
