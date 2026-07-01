@@ -145,9 +145,8 @@ services:
         volume:
           subpath: jszip.min.js
 
-  # Datadog Agent for observability. Opt-in via the "observability" profile so the
-  # default `docker compose up -d` starts only the broker:
-  #   docker compose --profile observability up -d
+  # Datadog Agent for observability. Enabled by default — `docker compose up -d`
+  # starts it alongside the broker.
   # Requires DD_API_KEY (see datadog/.env.example -> copy to .env).
   #
   # Metrics: the Agent SCRAPES the Ballerina services running on the host
@@ -158,7 +157,6 @@ services:
   datadog-agent:
     image: gcr.io/datadoghq/agent:latest
     container_name: demo-datadog-agent
-    profiles: ["observability"]
     environment:
       - DD_API_KEY=${DD_API_KEY}
       - DD_SITE=${DD_SITE}
