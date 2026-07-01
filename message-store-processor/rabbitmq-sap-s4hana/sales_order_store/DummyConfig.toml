@@ -1,0 +1,13 @@
+# Configuration for the sales_order_store package.
+# Connects to the RabbitMQ broker defined in ../docker-compose.yml.
+
+salesOrderQueueName = "sales-orders"
+
+[salesOrderStoreConfig]
+host = "localhost"
+port = 5672
+
+[salesOrderStoreConfig.connectionData]
+username = "guest"
+password = "guest"
+virtualHost = "/"

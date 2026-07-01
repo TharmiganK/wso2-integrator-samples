@@ -1,0 +1,40 @@
+# Configuration for the sales_order_processor package.
+# RabbitMQ broker is defined in ../docker-compose.yml.
+# SAP S/4HANA points at the local mock_sap_endpoint (port 9090).
+
+salesOrderQueueName = "sales-orders"
+deadLetterQueueName = "sales-orders-dlq"
+salesOrderResQueueName = "sales-orders-res"
+
+# SAP S/4HANA Sales Order service (mock endpoint). Auth is not verified by the mock.
+sapS4hanaUserName = "sap-user"
+sapS4hanaPassword = "sap-password"
+sapS4hanaHostName = "localhost"
+sapS4hanaPort = 9090
+
+[salesOrderStoreConfig]
+host = "localhost"
+port = 5672
+
+[salesOrderStoreConfig.connectionData]
+username = "guest"
+password = "guest"
+virtualHost = "/"
+
+[deadLetterStoreConfig]
+host = "localhost"
+port = 5672
+
+[deadLetterStoreConfig.connectionData]
+username = "guest"
+password = "guest"
+virtualHost = "/"
+
+[salesOrderResStoreConfig]
+host = "localhost"
+port = 5672
+
+[salesOrderResStoreConfig.connectionData]
+username = "guest"
+password = "guest"
+virtualHost = "/"

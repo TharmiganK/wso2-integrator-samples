@@ -1,0 +1,12 @@
+# Configuration for the sales_order_store package.
+# Connects to the Solace broker defined in ../docker-compose.yml.
+
+salesOrderQueueName = "sales-orders"
+
+[salesOrderStoreConfig]
+url = "tcp://localhost:45555"
+messageVpn = "default"
+
+[salesOrderStoreConfig.auth]
+username = "admin"
+password = "admin"
