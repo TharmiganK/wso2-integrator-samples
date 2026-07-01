@@ -171,10 +171,136 @@ The quickest way is the [`solace-msg-utility`](https://github.com/SolaceLabs/sol
 
 The broker CLI's `copy-message` command is a UI-free fallback. See the [DLQ replay runbook](../replaying-dead-lettered-orders.md) for the full walkthrough (including the connection and TLS details) and the RabbitMQ equivalent.
 
+## Observability with Datadog
+
+The two integration services publish **metrics** (Prometheus) and **distributed traces**
+(OpenTelemetry) that can be viewed in [Datadog](https://www.datadoghq.com/). A Datadog
+Agent runs in Docker alongside the broker: it **scrapes** the services' `/metrics`
+endpoints and receives **OTLP traces** the services push to it.
+
+```
+  sales_order_store (host :9797 /metrics) ─┐  scrape
+  sales_order_processor (host :9798 /metrics) ─┴──────▶ Datadog Agent ──▶ Datadog
+  sales_order_store / processor  ──OTLP gRPC push──▶  (localhost:4317)
+```
+
+| Service | Metrics endpoint | Traces |
+|---|---|---|
+| `sales_order_store` | `http://localhost:9797/metrics` | → Agent `localhost:4317` (OTLP/gRPC) |
+| `sales_order_processor` | `http://localhost:9798/metrics` | → Agent `localhost:4317` (OTLP/gRPC) |
+
+The extensions are imported in each `main.bal` and `remoteManagement = true` is set in
+each `Ballerina.toml` — both committed. The runtime toggle lives in each package's
+`Config.toml`, which is **git-ignored** (it holds local dev config), so add the block
+below to your local `Config.toml` if it isn't already there — using **port `9797` for
+`sales_order_store`** and **`9798` for `sales_order_processor`** so the two `/metrics`
+endpoints don't collide:
+
+```toml
+[ballerina.observe]
+tracingEnabled = true
+tracingProvider = "jaeger"
+metricsEnabled = true
+metricsReporter = "prometheus"
+
+[ballerinax.prometheus]
+port = 9797            # sales_order_store; use 9798 for sales_order_processor
+host = "0.0.0.0"       # bind all interfaces so the Dockerised Agent can scrape via host.docker.internal
+
+[ballerinax.jaeger]
+agentHostname = "localhost"   # the Agent's OTLP port is published to the host
+agentPort = 4317
+samplerType = "const"
+samplerParam = 1.0
+reporterFlushInterval = 2000
+reporterBufferSize = 1000
+```
+
+**Prerequisites**
+
+- A [Datadog account](https://www.datadoghq.com/) and an API key
+  (**Organization Settings → API Keys**).
+- Add the **OpenMetrics** integration to your Datadog account (Integrations tab).
+
+**1. Provide your API key.** From this directory:
+
+```bash
+cp datadog/.env.example .env
+# edit .env and set DD_API_KEY=<your-key>
+```
+
+`.env` is gitignored. `.env.example` also sets `DD_SITE` (default
+`datadoghq.com`) and `DD_SERVICE`; change `DD_SITE` in your `.env` if your
+account is on another site (e.g. `datadoghq.eu`).
+
+**2. Start the broker together with the Datadog Agent.** The Agent is behind an
+`observability` Compose profile, so enable it explicitly:
+
+```bash
+docker compose --profile observability up -d
+```
+
+(Without the profile, `docker compose up -d` still starts just the broker and its
+queue-provisioning init container.) Verify the Agent picked up the OpenMetrics check and
+OTLP receiver:
+
+```bash
+docker exec demo-datadog-agent agent status | grep -A5 -iE "openmetrics|otlp|apm"
+```
+
+**3. Run the services** as in [Running the sample](#running-the-sample) and send a few
+orders. The Agent scrapes host ports `9797`/`9798` (via `host.docker.internal`) and the
+services push traces to `localhost:4317`.
+
+**4. View in Datadog.**
+
+- **Metrics** → *Metrics Explorer*: search for `ballerina.*`. Ballerina ships a ready-made
+  dashboard you can import under *Dashboards → New → Import*:
+  [`ballerina_metrics_dashboard.json`](https://raw.githubusercontent.com/ballerina-platform/module-ballerinax-prometheus/refs/heads/main/metrics-dashboards/datadog/ballerina_metrics_dashboard.json).
+- **APM → Traces**: filter by service (`sales_order_store`, `sales_order_processor`) to
+  inspect spans and tags.
+- **Logs → Log Explorer**: filter `source:ballerina` (and `env:dev` or a `service:`) — see
+  the *Logs* note below to enable shipping.
+
+### Logs
+
+The services run on the host via `bal run`, so the Dockerised Agent can't grab their
+stdout directly. Instead each service writes **JSON logs to a file** under the sample-root
+`logs/` directory, and the Agent tails those files (`DD_LOGS_ENABLED=true` +
+`datadog/conf.d/ballerina.d/conf.yaml`, both already in the compose setup).
+
+Enabling this is a one-line-per-service addition to your local `Config.toml` (git-ignored),
+alongside the observability block above — `sales_order_store` writes
+`../logs/sales_order_store.log`, `sales_order_processor` writes
+`../logs/sales_order_processor.log`:
+
+```toml
+[ballerina.log]
+format = "json"
+keyValues = { service = "sales_order_store", env = "dev" }   # service = "sales_order_processor" for the processor
+
+[[ballerina.log.destinations]]
+type = "stdout"                               # keep console output visible
+
+[[ballerina.log.destinations]]
+path = "../logs/sales_order_store.log"        # ../logs/sales_order_processor.log for the processor
+```
+
+The relative path resolves against the sample root because you start each service with
+`cd <package> && bal run`. Bring the stack up with `docker compose --profile observability
+up -d`, run the services, post a few orders, and the lines appear under **Logs → Log
+Explorer** (`source:ballerina`), parsed as JSON. Because `service` matches the APM service
+name, logs and traces correlate. Confirm the Agent is tailing them with:
+
+```bash
+docker exec demo-datadog-agent agent status | grep -A15 -i "logs agent"
+```
+
 ## Cleaning up
 
 ```bash
-docker compose down -v
+docker compose --profile observability down -v
 ```
 
-The `-v` flag also removes the broker's data volume so the next run starts from a clean state.
+The `-v` flag also removes the broker's data volume so the next run starts from a clean
+state. (Omit `--profile observability` if you started the broker without the Agent.)

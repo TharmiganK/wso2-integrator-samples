@@ -1,0 +1,2 @@
+# Keeps the logs/ directory in git so the Datadog Agent's bind-mount target exists on a
+# fresh clone. The Ballerina services write <service>.log JSON files here (git-ignored).
