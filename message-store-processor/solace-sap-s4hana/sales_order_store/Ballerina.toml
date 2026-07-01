@@ -8,3 +8,4 @@ title = "Sales Order Store"
 [build-options]
 sticky = true
 remoteManagement = true
+observabilityIncluded = true

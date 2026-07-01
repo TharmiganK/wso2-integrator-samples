@@ -313,6 +313,9 @@ dependencies = [
 	{org = "ballerina", name = "jballerina.java"},
 	{org = "ballerina", name = "observe"}
 ]
+modules = [
+	{org = "ballerinai", packageName = "observe", moduleName = "observe"}
+]
 
 [[package]]
 org = "ballerinax"
@@ -387,6 +390,7 @@ version = "0.1.0"
 dependencies = [
 	{org = "ballerina", name = "log"},
 	{org = "ballerina", name = "messaging"},
+	{org = "ballerinai", name = "observe"},
 	{org = "ballerinax", name = "jaeger"},
 	{org = "ballerinax", name = "prometheus"},
 	{org = "ballerinax", name = "sap.s4hana.api_sales_order_srv"},
