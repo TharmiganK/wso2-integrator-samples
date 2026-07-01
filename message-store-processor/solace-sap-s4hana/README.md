@@ -160,6 +160,17 @@ You get back `202 Accepted` as soon as the order is stored. Watch the `sales_ord
 
 To watch the guaranteed-delivery behaviour clearly, set `failurePercentage = 100` in `mock_sap_endpoint/Config.toml` and restart the mock: every order is retried twice and then ends up on `sales-orders-dlq`. You can inspect all three queues and their message counts under **Queues** in the [Solace SEMP UI](http://localhost:8080).
 
+## Replaying dead-lettered orders
+
+Once the root cause is fixed (e.g. set `failurePercentage = 0` and restart the mock), the orders sitting on `sales-orders-dlq` can be replayed back onto `sales-orders` **from the broker itself**, with no application change — `sales_order_processor` then reprocesses them normally.
+
+The quickest way is the [`solace-msg-utility`](https://github.com/SolaceLabs/solace-msg-utility) web UI that `docker compose up` already started at [https://localhost:9444](https://localhost:9444):
+
+1. **Connections** → Broker Host `solace`, SMF port `8008` (TLS off), SEMP port `8080` (TLS off), VPN `default`, user `admin` / `admin` → **Connect** (both status dots green).
+2. **Queue Copy** → Source `sales-orders-dlq`, Destination `sales-orders`, mode **Move** (clears the DLQ) or **Copy** (keeps an audit copy) → confirm → **Copy**/**Move**.
+
+The broker CLI's `copy-message` command is a UI-free fallback. See the [DLQ replay runbook](../replaying-dead-lettered-orders.md) for the full walkthrough (including the connection and TLS details) and the RabbitMQ equivalent.
+
 ## Cleaning up
 
 ```bash
