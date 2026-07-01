@@ -28,7 +28,7 @@ This is the RabbitMQ variant. A functionally identical [Solace variant](../solac
                                                        │ createA_SalesOrder()
                                                        ▼
                                           mock_sap_endpoint (HTTPS 9090)
-                                          70% success · 30% failure
+                                          always succeeds · stop it to force failures
                                                        │
                          success ─────────────┐        └───────────── failure / parse error
                                               ▼                              ▼
@@ -104,7 +104,7 @@ virtualHost = "/"
 # deadLetterStoreConfig and salesOrderResStoreConfig follow the same shape.
 ```
 
-The store and listener tuning knobs are set in code in `sales_order_processor/main.bal`: `pollingInterval` (10s) and `maxRetries` (`0` — in-place retry is disabled because failures are handed to the review workflow instead). The mock failure rate is set with `failurePercentage` in `mock_sap_endpoint/Config.toml` (default `30`; use `0` to always succeed or `100` to always fail).
+The store and listener tuning knobs are set in code in `sales_order_processor/main.bal`: `pollingInterval` (10s) and `maxRetries` (`0` — in-place retry is disabled because failures are handed to the review workflow instead). The mock SAP endpoint always returns success; to push an order into the review workflow, stop it so the processor's create call cannot reach SAP (see [Trying it out](#trying-it-out)).
 
 The review workflow needs the management API backed by a real server, so `sales_order_processor/Config.toml` also selects `LOCAL` workflow mode against the Temporal dev server and enables the management API:
 
@@ -237,11 +237,11 @@ curl -X POST http://localhost:9091/api/sales-order \
 
 You get back `202 Accepted` as soon as the order is stored. Watch the `sales_order_processor` logs to see it picked up, sent to SAP, and either succeeding (an order id is logged and a record lands on `sales-orders-res`) or failing and starting a review workflow.
 
-To watch the human-in-the-loop path clearly, set `failurePercentage = 100` in `mock_sap_endpoint/Config.toml` and restart the mock: every order fails and appears under **Failed Sales Orders** in the [console](http://localhost:5173). Open one, lower `failurePercentage` back to `0`, and **replay** it — it now succeeds and a record lands on `sales-orders-res`. To see the terminal sink, keep `failurePercentage = 100`, replay, let the replay fail, then **give up** on the resulting failed replay — the message is moved to `sales-orders-dlq`, which you can inspect in the [RabbitMQ management UI](http://localhost:15672). Posting a malformed payload instead exercises the parse-error path, where you can fix the order via **retry with new input**.
+To watch the human-in-the-loop path clearly, **stop the mock SAP endpoint** (Ctrl-C in its terminal) and post an order: the processor cannot reach SAP, so the order fails and appears under **Failed Sales Orders** in the [console](http://localhost:5173). **Restart the mock** (`bal run` in `mock_sap_endpoint`), open the failed order, and **replay** it — it now succeeds and a record lands on `sales-orders-res`. To see the terminal sink, leave the mock stopped, replay, let the replay fail, then **give up** on the resulting failed replay — the message is moved to `sales-orders-dlq`, which you can inspect in the [RabbitMQ management UI](http://localhost:15672). Posting a malformed payload instead exercises the parse-error path, where you can fix the order via **retry with new input**.
 
 ## Replaying dead-lettered orders
 
-Once the root cause is fixed (e.g. set `failurePercentage = 0` and restart the mock), the orders sitting on `sales-orders-dlq` can be replayed back onto `sales-orders` **from the broker itself**, with no application change — `sales_order_processor` then reprocesses them normally.
+Once the root cause is fixed (e.g. restart the mock SAP endpoint if you stopped it), the orders sitting on `sales-orders-dlq` can be replayed back onto `sales-orders` **from the broker itself**, with no application change — `sales_order_processor` then reprocesses them normally.
 
 Everything is done from the [RabbitMQ management UI](http://localhost:15672):
 

@@ -4,7 +4,7 @@ When the review workflow gives up on a failed sales order, the message ends up o
 
 This works because a broker-side move/copy is **verbatim**: the message placed back on `sales-orders` is byte-identical to the one the message store originally wrote, so the `messaging:StoreListener` consumes and reprocesses it with no change to the integration. A successful replay lands a record on `sales-orders-res`; a replay that fails again simply re-enters the review flow and can return to the DLQ.
 
-> **Fix the root cause first.** If the condition that failed the order is still present, a replayed order just fails again and comes straight back to the DLQ. For a clean demo, set `failurePercentage = 0` in `mock_sap_endpoint/Config.toml` and restart the mock before replaying, so every replayed order succeeds.
+> **Fix the root cause first.** If the condition that failed the order is still present, a replayed order just fails again and comes straight back to the DLQ. For a clean demo, make sure the mock SAP endpoint is running (restart it if you stopped it to force the failures) before replaying, so every replayed order succeeds.
 
 ---
 
