@@ -235,15 +235,14 @@ cp datadog/.env.example .env
 `datadoghq.com`) and `DD_SERVICE`; change `DD_SITE` in your `.env` if your
 account is on another site (e.g. `datadoghq.eu`).
 
-**2. Start the broker together with the Datadog Agent.** The Agent is behind an
-`observability` Compose profile, so enable it explicitly:
+**2. Start the broker together with the Datadog Agent.** Observability is enabled by
+default, so a plain `up` starts both the broker and the Agent:
 
 ```bash
-docker compose --profile observability up -d
+docker compose up -d
 ```
 
-(Without the profile, `docker compose up -d` still starts just the broker.) Verify the
-Agent picked up the OpenMetrics check and OTLP receiver:
+Verify the Agent picked up the OpenMetrics check and OTLP receiver:
 
 ```bash
 docker exec demo-datadog-agent agent status | grep -A5 -iE "openmetrics|otlp|apm"
@@ -288,8 +287,8 @@ path = "../logs/sales_order_store.log"        # ../logs/sales_order_processor.lo
 ```
 
 The relative path resolves against the sample root because you start each service with
-`cd <package> && bal run`. Bring the stack up with `docker compose --profile observability
-up -d`, run the services, post a few orders, and the lines appear under **Logs → Log
+`cd <package> && bal run`. Bring the stack up with `docker compose up -d`, run the
+services, post a few orders, and the lines appear under **Logs → Log
 Explorer** (`source:ballerina`), parsed as JSON. Because `service` matches the APM service
 name, logs and traces correlate. Confirm the Agent is tailing them with:
 
@@ -300,8 +299,8 @@ docker exec demo-datadog-agent agent status | grep -A15 -i "logs agent"
 ## Cleaning up
 
 ```bash
-docker compose --profile observability down -v
+docker compose down -v
 ```
 
 The `-v` flag also removes the broker's data volume so the next run starts from a clean
-state. (Omit `--profile observability` if you started the broker without the Agent.)
+state.
