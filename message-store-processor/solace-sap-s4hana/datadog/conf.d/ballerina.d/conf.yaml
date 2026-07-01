@@ -1,0 +1,17 @@
+# Datadog log source. Mounted into the Agent container at
+# /etc/datadog-agent/conf.d/ballerina.d/conf.yaml by ../docker-compose.yml, which also
+# mounts the host `logs/` dir to /var/log/ballerina and sets DD_LOGS_ENABLED=true.
+#
+# The Ballerina services (run on the host via `bal run`) write JSON logs to
+# ../logs/<service>.log; the Agent tails them from the bind mount. `service` matches the
+# APM service name so logs and traces correlate; `source: ballerina` drives log parsing.
+logs:
+  - type: file
+    path: /var/log/ballerina/sales_order_store.log
+    service: sales_order_store
+    source: ballerina
+
+  - type: file
+    path: /var/log/ballerina/sales_order_processor.log
+    service: sales_order_processor
+    source: ballerina

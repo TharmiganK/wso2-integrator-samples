@@ -247,6 +247,42 @@ services push traces to `localhost:4317`.
   [`ballerina_metrics_dashboard.json`](https://raw.githubusercontent.com/ballerina-platform/module-ballerinax-prometheus/refs/heads/main/metrics-dashboards/datadog/ballerina_metrics_dashboard.json).
 - **APM → Traces**: filter by service (`sales_order_store`, `sales_order_processor`) to
   inspect spans and tags.
+- **Logs → Log Explorer**: filter `source:ballerina` (and `env:dev` or a `service:`) — see
+  the *Logs* note below to enable shipping.
+
+### Logs
+
+The services run on the host via `bal run`, so the Dockerised Agent can't grab their
+stdout directly. Instead each service writes **JSON logs to a file** under the sample-root
+`logs/` directory, and the Agent tails those files (`DD_LOGS_ENABLED=true` +
+`datadog/conf.d/ballerina.d/conf.yaml`, both already in the compose setup).
+
+Enabling this is a one-line-per-service addition to your local `Config.toml` (git-ignored),
+alongside the observability block above — `sales_order_store` writes
+`../logs/sales_order_store.log`, `sales_order_processor` writes
+`../logs/sales_order_processor.log`:
+
+```toml
+[ballerina.log]
+format = "json"
+keyValues = { service = "sales_order_store", env = "dev" }   # service = "sales_order_processor" for the processor
+
+[[ballerina.log.destinations]]
+type = "stdout"                               # keep console output visible
+
+[[ballerina.log.destinations]]
+path = "../logs/sales_order_store.log"        # ../logs/sales_order_processor.log for the processor
+```
+
+The relative path resolves against the sample root because you start each service with
+`cd <package> && bal run`. Bring the stack up with `docker compose --profile observability
+up -d`, run the services, post a few orders, and the lines appear under **Logs → Log
+Explorer** (`source:ballerina`), parsed as JSON. Because `service` matches the APM service
+name, logs and traces correlate. Confirm the Agent is tailing them with:
+
+```bash
+docker exec demo-datadog-agent agent status | grep -A15 -i "logs agent"
+```
 
 ## Cleaning up
 
