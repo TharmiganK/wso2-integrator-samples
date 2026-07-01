@@ -14,7 +14,6 @@
 // specific language governing permissions and limitations
 // under the License.
 
-import ballerina/log;
 import ballerina/messaging;
 import ballerina/uuid;
 import ballerinax/solace;
@@ -85,7 +84,6 @@ public isolated client class MessageStore {
         if result is error {
             return error("Failed to store message in Solace", cause = result);
         }
-        log:printInfo("message stored");
     }
 
     # Retrieves the top message from the Solace message store without removing it. The message

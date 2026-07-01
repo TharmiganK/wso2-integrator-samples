@@ -80,9 +80,6 @@ dependencies = [
 	{org = "ballerina", name = "lang.value"},
 	{org = "ballerina", name = "observe"}
 ]
-modules = [
-	{org = "ballerina", packageName = "log", moduleName = "log"}
-]
 
 [[package]]
 org = "ballerina"
@@ -154,7 +151,6 @@ org = "wso2"
 name = "solace"
 version = "0.1.0"
 dependencies = [
-	{org = "ballerina", name = "log"},
 	{org = "ballerina", name = "messaging"},
 	{org = "ballerina", name = "uuid"},
 	{org = "ballerinax", name = "solace"}
