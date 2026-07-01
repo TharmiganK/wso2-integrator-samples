@@ -79,27 +79,3 @@ public type SalesOrderWrapper record {
     # The created sales order
     SalesOrderData d;
 };
-
-// SAP OData v2 error response shape.
-
-# Localized error message within an OData error.
-public type ODataErrorMessage record {
-    # Language code (e.g. `en`)
-    string lang;
-    # The message text
-    string value;
-};
-
-# The `error` object within an OData v2 error response.
-public type ODataError record {
-    # SAP error code (e.g. `SY/530`)
-    string code;
-    # The localized error message
-    ODataErrorMessage message;
-};
-
-# OData v2 error envelope: `{ "error": { ... } }`.
-public type ODataErrorResponse record {
-    # The error details
-    ODataError 'error;
-};
