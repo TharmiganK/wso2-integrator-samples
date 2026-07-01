@@ -231,8 +231,9 @@ cp datadog/.env.example .env
 # edit .env and set DD_API_KEY=<your-key>
 ```
 
-`.env` is gitignored. `DD_SITE` defaults to `datadoghq.com`; change it in
-`docker-compose.yml` if your account is on another site (e.g. `datadoghq.eu`).
+`.env` is gitignored. `.env.example` also sets `DD_SITE` (default
+`datadoghq.com`) and `DD_SERVICE`; change `DD_SITE` in your `.env` if your
+account is on another site (e.g. `datadoghq.eu`).
 
 **2. Start the broker together with the Datadog Agent.** The Agent is behind an
 `observability` Compose profile, so enable it explicitly:
