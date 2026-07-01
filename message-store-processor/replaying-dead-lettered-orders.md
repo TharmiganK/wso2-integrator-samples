@@ -51,30 +51,26 @@ Pure built-in UI, no plugin — and this is where you can **edit** a message bef
 
 ---
 
-## Solace — from the broker's `copy-message` command
+## Solace — from the `solace-msg-utility` web UI
 
-Solace PubSub+ **Broker Manager (http://localhost:8080) does not browse, copy, or move spooled messages** — its only message tool is *Try Me!*, which publishes to a topic (and `sales-orders` has no topic subscription, since the store writes straight to the queue). So the broker-side replay path on Solace is the **`copy-message` admin command** on the broker CLI (`copy-message` is available on PubSub+ ≥ 10.0.0, which the `:latest` image satisfies), not the web console.
+Solace PubSub+ **Broker Manager (http://localhost:8080) does not browse, copy, or move spooled messages** — its only message tool is *Try Me!*, which publishes to a topic (and `sales-orders` has no topic subscription, since the store writes straight to the queue). So the broker-side replay path on Solace needs a tool that can browse and move queued messages over SEMP/SMF.
 
-Two things to know, both different from RabbitMQ's shovel:
+This sample's `docker-compose.yml` runs [SolaceLabs' `solace-msg-utility`](https://github.com/SolaceLabs/solace-msg-utility) — a browser-based Queue Browser / Queue Copy tool — as the `solace-msg-utility` service, so replaying never needs the broker CLI. (A companion `solace-msg-utility-init` job downloads the tool's two vendor scripts, `solclient.js` and `jszip.min.js`, on first `docker compose up` — the published image ships without them, so this must complete before the UI can connect. It runs automatically; you only notice it on a cold start.)
 
-- **`copy-message` copies, it does not move.** The original message stays on `sales-orders-dlq` (the DLQ keeps an audit copy). If you also want to clear the DLQ, delete that message afterwards with `delete-messages queue sales-orders-dlq message <msg-id>` (the numeric `msgId` from the SEMPv2 monitor, not the `replicationGroupMsgId`) — or set `DELETE_AFTER_COPY=1` when using the scripted flow below, which does this for you once every copy has succeeded.
-- **The broker CLI needs a TTY.** Commands cannot simply be piped into `docker exec -i … cli`; that prints the banner and silently ignores the input. Run it interactively (`docker exec -it`), or use the helper script below, which drives the CLI over a pseudo-terminal.
+### Recommended — Queue Copy
 
-`copy-message` copies a **single** message identified by its `replicationGroupMsgId`, so the flow is: discover the id(s), then copy each one.
+1. Open **https://localhost:9444**. The gateway uses a self-signed certificate, so accept the browser's "not secure" warning (**Proceed anyway**) — expected, not a misconfiguration.
+2. **Connections** — the container reverse-proxies to the broker, so use the broker's Docker network alias and its **plaintext** ports:
+   - Broker Host `solace`, SMF port `8008` (**TLS off**), SEMP host `solace` port `8080` (**TLS off**), VPN `default`, user `admin` / `admin` → **Connect**.
+   - `solace` resolves because the gateway runs on the same Docker network as the broker. TLS must stay off for both: the broker's exposed SEMP/SMF ports are plaintext — the gateway supplies the HTTPS the browser sees.
+3. Open **Queue Copy**: Source Queue `sales-orders-dlq`, Destination Queue `sales-orders`, mode **Move** (clears the DLQ once every message lands) or **Copy** (keeps an audit copy on the DLQ).
+4. Review the **Confirm Queue Copy** pre-flight summary (message count, size, destination quota) and click **Copy**/**Move**.
 
-### Scripted (recommended)
+Queue Copy snapshots the source queue before starting (a bounded run) and halts on the first error, so a failed run never leaves messages half-moved — matching the "never lose an order" guarantee this flow needs. It moves/copies messages verbatim and cannot edit a body in transit (see the editing table below).
 
-This sample ships a helper that does both steps for every message on the DLQ:
+### Manual — broker CLI (fallback, no UI)
 
-```bash
-cd solace-sap-s4hana
-./replay-from-dlq.py                       # copy only, keep DLQ audit copies
-DELETE_AFTER_COPY=1 ./replay-from-dlq.py   # copy, then clear the DLQ
-```
-
-It lists the DLQ messages via the SEMPv2 monitor API and drives one `copy-message` per id into the broker CLI over a pseudo-terminal (Python 3, standard library only). With `DELETE_AFTER_COPY=1`, it only deletes the originals once the copy pass comes back error-free — an order can never be lost without a confirmed copy first. Override defaults with env vars (`SRC_QUEUE`, `DST_QUEUE`, `SOLACE_CONTAINER`, …) if needed.
-
-### Manual
+`copy-message` copies a **single** message identified by its `replicationGroupMsgId` (available on PubSub+ ≥ 10.0.0, which the `:latest` image satisfies); it copies rather than moves, so clearing the DLQ needs a separate `delete-messages` call by numeric `msgId`. The broker CLI also needs a TTY — commands cannot simply be piped into `docker exec -i … cli`, that prints the banner and silently ignores the input.
 
 1. **List the message ids** on the DLQ via the SEMPv2 monitor API:
 
@@ -109,7 +105,7 @@ Regardless of broker, after replaying:
 
 - The **`sales_order_processor` logs** show the order received and processed again.
 - A successful order writes a record to **`sales-orders-res`**.
-- Queue depths confirm it: `sales-orders` spikes then drains as the processor consumes it. On **RabbitMQ** the shovel *moves*, so `sales-orders-dlq` drops to 0; on **Solace** `copy-message` *copies*, so the DLQ keeps its copy until you delete it (or ran the script with `DELETE_AFTER_COPY=1` set). Check depths in the [RabbitMQ Management UI](http://localhost:15672) (**Queues**) or the [Solace Broker Manager](http://localhost:8080) (**Queues** → select the queue → **Messages Queued**).
+- Queue depths confirm it: `sales-orders` spikes then drains as the processor consumes it. On **RabbitMQ** the shovel *moves*, so `sales-orders-dlq` drops to 0; on **Solace**, the DLQ keeps its copy unless you used Queue Copy's **Move** mode (or `copy-message` + a manual `delete-messages`). Check depths in the [RabbitMQ Management UI](http://localhost:15672) (**Queues**), the [Solace Broker Manager](http://localhost:8080) (**Queues** → select the queue → **Messages Queued**), or the `solace-msg-utility` Queue Browser (https://localhost:9444).
 
 > On Solace, the live **Messages Queued** browse is authoritative; the queue's `spooledMsgCount` summary metric can lag and read high.
 
@@ -120,6 +116,6 @@ Regardless of broker, after replaying:
 | Broker | Replay verbatim | Edit-then-replay from the console |
 |---|---|---|
 | **RabbitMQ** | Shovel, or manual Get + Publish | ✅ Native — edit the payload in the **Publish message** dialog (Option B). |
-| **Solace** | `copy-message` (CLI / SEMP) | ❌ Not cleanly. `copy-message` copies verbatim and cannot edit. *Try Me!* can publish an edited payload, but only to a **topic**, so `sales-orders` would first need a topic subscription (a configuration change), or you would use an external tool such as the [SolaceLabs `solace-msg-utility`](https://github.com/SolaceLabs/solace-msg-utility). |
+| **Solace** | Queue Copy (`solace-msg-utility`) / `copy-message` (CLI) | ❌ Not cleanly. Both Queue Copy and `copy-message` move/copy verbatim and cannot edit a body in transit. *Try Me!* can publish an edited payload, but only to a **topic**, so `sales-orders` would first need a topic subscription (a configuration change). |
 
 If uniform edit-then-replay from the console becomes a requirement, the design change that unlocks it is to have the store publish to a **topic** that `sales-orders` subscribes to, instead of writing directly to the queue — then both brokers' console publishers become first-class edit-and-replay tools.
