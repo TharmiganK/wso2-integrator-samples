@@ -1,0 +1,37 @@
+# Configuration for the sales_order_processor package.
+# Solace broker is defined in ../docker-compose.yml.
+# SAP S/4HANA points at the local mock_sap_endpoint (port 9090).
+
+salesOrderQueueName = "sales-orders"
+deadLetterQueueName = "sales-orders-dlq"
+salesOrderResQueueName = "sales-orders-res"
+
+# SAP S/4HANA Sales Order service (mock endpoint). Auth is not verified by the mock.
+sapS4hanaUserName = "sap-user"
+sapS4hanaPassword = "sap-password"
+sapS4hanaHostName = "localhost"
+sapS4hanaPort = 9090
+
+[salesOrderStoreConfig]
+url = "tcp://localhost:45555"
+messageVpn = "default"
+
+[salesOrderStoreConfig.auth]
+username = "admin"
+password = "admin"
+
+[deadLetterStoreConfig]
+url = "tcp://localhost:45555"
+messageVpn = "default"
+
+[deadLetterStoreConfig.auth]
+username = "admin"
+password = "admin"
+
+[salesOrderResStoreConfig]
+url = "tcp://localhost:45555"
+messageVpn = "default"
+
+[salesOrderResStoreConfig.auth]
+username = "admin"
+password = "admin"
