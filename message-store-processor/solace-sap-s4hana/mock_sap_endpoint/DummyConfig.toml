@@ -1,0 +1,13 @@
+# Configuration for the mock SAP S/4HANA Sales Order service.
+
+# Port the mock listens on. The service is mounted at:
+#   http://localhost:<port>/sap/opu/odata/sap/API_SALES_ORDER_SRV/A_SalesOrder
+port = 9090
+
+# Percentage (0-100) of requests that should fail, so the sales_order_processor's
+# retry / dead-letter handling can be exercised.
+#   0   = always succeed
+#   100 = always fail
+# Failures cycle through: 500 internal error, 400 validation error,
+# 503 service unavailable, and 200 with an empty body.
+failurePercentage = 30
