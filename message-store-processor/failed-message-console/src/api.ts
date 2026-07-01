@@ -44,11 +44,21 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
   const text = await res.text();
   const data = text ? safeParse(text) : null;
   if (!res.ok) {
-    const msg =
-      (data && (data.error || data.message)) || `${res.status} ${res.statusText}`;
-    throw new ApiError(res.status, msg);
+    throw new ApiError(res.status, errorMessage(data) || `${res.status} ${res.statusText}`);
   }
   return data as T;
+}
+
+// Pull a human-readable string out of an error body. The workflow management API
+// nests it as {error: {message}}, but plain {error: "..."} / {message: "..."}
+// shapes are handled too, so the banner never renders "[object Object]".
+function errorMessage(data: any): string | null {
+  const field = data && (data.error ?? data.message);
+  if (typeof field === "string") return field;
+  if (field && typeof field === "object" && typeof field.message === "string") {
+    return field.message;
+  }
+  return null;
 }
 
 function safeParse(text: string): any {
