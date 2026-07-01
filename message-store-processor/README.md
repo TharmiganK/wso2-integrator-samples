@@ -52,6 +52,14 @@ The **[`failed-message-console`](./failed-message-console)** is shared by both s
 
 ## Replaying dead-lettered orders
 
-Orders that end up on the `sales-orders-dlq` queue can be replayed back onto `sales-orders` **from the broker itself**, with no application code — the broker re-injects the message verbatim and `sales_order_processor` reprocesses it. See **[replaying-dead-lettered-orders.md](./replaying-dead-lettered-orders.md)** for the step-by-step runbook: the RabbitMQ Management UI (Shovel, or manual Get + Publish) and the Solace `copy-message` command (with the [`solace-sap-s4hana/replay-from-dlq.py`](./solace-sap-s4hana/replay-from-dlq.py) helper). The runbook also covers the feasibility of editing a message while replaying.
+Orders that end up on the `sales-orders-dlq` queue can be replayed back onto `sales-orders` **from the broker itself**, with no application code — the broker re-injects the message verbatim and `sales_order_processor` reprocesses it. See **[replaying-dead-lettered-orders.md](./replaying-dead-lettered-orders.md)** for the step-by-step runbook: the RabbitMQ Management UI (Shovel, or manual Get + Publish) and, on Solace, the [`solace-msg-utility`](https://github.com/SolaceLabs/solace-msg-utility) web UI (Queue Copy) that ships with `solace-sap-s4hana/docker-compose.yml`, or the broker's `copy-message` CLI as a fallback. The runbook also covers the feasibility of editing a message while replaying.
+
+## Observability
+
+Both samples publish metrics (Prometheus), distributed traces (OpenTelemetry) and JSON
+logs to [Datadog](https://www.datadoghq.com/) via a Docker-based Datadog Agent that runs
+alongside the broker. Observability is enabled by default, so each sample requires a Datadog
+API key — see the **Prerequisites** and **Viewing telemetry in Datadog** sections in its
+README.
 
 Pick the sample that matches your broker and follow its README — each is self-contained with full setup and run instructions.

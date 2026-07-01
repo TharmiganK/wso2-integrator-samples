@@ -379,6 +379,37 @@ dependencies = [
 	{org = "ballerina", name = "jballerina.java"},
 	{org = "ballerina", name = "observe"}
 ]
+modules = [
+	{org = "ballerinai", packageName = "observe", moduleName = "observe"}
+]
+
+[[package]]
+org = "ballerinax"
+name = "jaeger"
+version = "1.1.0"
+dependencies = [
+	{org = "ballerina", name = "io"},
+	{org = "ballerina", name = "jballerina.java"},
+	{org = "ballerina", name = "log"},
+	{org = "ballerina", name = "observe"}
+]
+modules = [
+	{org = "ballerinax", packageName = "jaeger", moduleName = "jaeger"}
+]
+
+[[package]]
+org = "ballerinax"
+name = "prometheus"
+version = "1.0.0"
+dependencies = [
+	{org = "ballerina", name = "http"},
+	{org = "ballerina", name = "io"},
+	{org = "ballerina", name = "lang.string"},
+	{org = "ballerina", name = "observe"}
+]
+modules = [
+	{org = "ballerinax", packageName = "prometheus", moduleName = "prometheus"}
+]
 
 [[package]]
 org = "ballerinax"
@@ -435,6 +466,9 @@ dependencies = [
 	{org = "ballerina", name = "log"},
 	{org = "ballerina", name = "messaging"},
 	{org = "ballerina", name = "workflow"},
+	{org = "ballerinai", name = "observe"},
+	{org = "ballerinax", name = "jaeger"},
+	{org = "ballerinax", name = "prometheus"},
 	{org = "ballerinax", name = "rabbitmq"},
 	{org = "ballerinax", name = "sap.s4hana.api_sales_order_srv"}
 ]

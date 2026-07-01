@@ -5,6 +5,11 @@ import ballerina/workflow;
 // /workflow), which the failed-message console consumes to list and act on tasks.
 import ballerina/workflow.management as _;
 
+// Observability: expose Prometheus metrics on /metrics and push OpenTelemetry
+// traces to the Datadog Agent's OTLP receiver. See ../datadog and Config.toml.
+import ballerinax/prometheus as _;
+import ballerinax/jaeger as _;
+
 # Polls the sales-order store and drives each message through processing. Instead of
 # the listener's in-place retry / dead-letter behaviour, a message that fails to
 # process or parse is handed to a durable human-review workflow so a manager can

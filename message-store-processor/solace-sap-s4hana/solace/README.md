@@ -6,8 +6,8 @@ A [Solace PubSub+](https://solace.com/products/event-broker/) backed implementat
 
 The package exposes a single client class, `MessageStore`, that implements `messaging:Store`:
 
-- **`store`** publishes a message to a Solace queue through a `solace:MessageProducer`.
-- **`retrieve`** reads the next message from the same queue through a transacted `solace:MessageConsumer`, without removing it from the queue.
+- **`store`** publishes a message to a Solace queue through a `solace:MessageProducer`. The payload is serialized to JSON and sent as bytes, so it always lands as a plain binary Solace message (rather than an SDT structured-map message, which some broker tooling cannot render).
+- **`retrieve`** reads the next message from the same queue through a transacted `solace:MessageConsumer`, without removing it from the queue. The payload is returned as a `byte[]` (the JSON bytes written by `store`); decode it with `string:fromBytes(...).fromJsonStringWithType()`.
 - **`acknowledge`** commits the transacted receive on success (the message leaves the queue) or rolls it back on failure (the broker re-delivers the message).
 
 Because the consumer session runs in `SESSION_TRANSACTED` mode, message removal is tied to an explicit acknowledgment. A message retrieved but not yet acknowledged stays on the queue, so an unexpected shutdown will not lose it.
@@ -36,13 +36,13 @@ configurable solace:StoreClientConfiguration storeConfig = ?;
 public function main() returns error? {
     messaging:Store store = check new solace:MessageStore("sales-orders", storeConfig);
 
-    // Store a message on the queue.
+    // Store a message on the queue (serialized to JSON bytes).
     check store->store({orderId: "ORD-001", amount: 250.00});
 
     // Retrieve the next message without removing it.
     messaging:Message? message = check store->retrieve();
     if message is messaging:Message {
-        // Process the message, then acknowledge.
+        // message.payload is a byte[] of JSON; decode before use.
         boolean processed = process(message.payload);
         // success = true commits (removes); success = false rolls back (re-delivers).
         check store->acknowledge(message.id, processed);
@@ -79,7 +79,7 @@ The broker's native SMF port `55555` is remapped to `45555` on the host (the Sol
 | Member                                              | Description                                                                  |
 |-----------------------------------------------------|------------------------------------------------------------------------------|
 | `init(string queueName, *StoreClientConfiguration)` | Connects the producer and transacted consumer to the given queue.            |
-| `store(anydata payload)`                            | Publishes a message to the queue.                                            |
-| `retrieve()`                                        | Returns the next message (`messaging:Message`) without removing it, or `()`. |
+| `store(anydata payload)`                            | Serializes the payload to JSON bytes and publishes it to the queue.           |
+| `retrieve()`                                        | Returns the next message (`messaging:Message`, payload as JSON `byte[]`) without removing it, or `()`. |
 | `acknowledge(string id, boolean success = true)`    | Commits (success) or rolls back (failure) the retrieved message.             |
 | `close()`                                           | Closes the underlying producer and consumer connections.                     |

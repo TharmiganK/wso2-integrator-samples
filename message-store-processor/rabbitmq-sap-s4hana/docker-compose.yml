@@ -34,5 +34,39 @@ services:
       - "7233:7233"   # gRPC frontend (used by the workflow runtime in LOCAL mode)
       - "8233:8233"   # Temporal Web UI -> http://localhost:8233
 
+  # Datadog Agent for observability. Enabled by default — `docker compose up -d`
+  # starts it alongside the broker.
+  # Requires DD_API_KEY (see datadog/.env.example -> copy to .env).
+  #
+  # Metrics: the Agent SCRAPES the Ballerina services running on the host
+  #   (sales_order_store :9797, sales_order_processor :9798) via host.docker.internal,
+  #   configured in datadog/conf.d/prometheus.d/conf.yaml.
+  # Traces:  the Ballerina services PUSH OTLP/gRPC spans to the Agent on localhost:4317
+  #   (published below). See ../replaying... and each package's Config.toml.
+  datadog-agent:
+    image: gcr.io/datadoghq/agent:latest
+    container_name: demo-datadog-agent
+    environment:
+      - DD_API_KEY=${DD_API_KEY}
+      - DD_SITE=${DD_SITE}
+      # Required: agent cannot auto-detect hostname inside a container on macOS
+      - DD_HOSTNAME=rabbitmq-sap-s4hana-dev
+      # Enable OTLP ingest — receives traces from the Ballerina Jaeger connector on port 4317
+      - DD_OTLP_CONFIG_RECEIVER_PROTOCOLS_GRPC_ENDPOINT=0.0.0.0:4317
+      - DD_OTLP_CONFIG_RECEIVER_PROTOCOLS_HTTP_ENDPOINT=0.0.0.0:4318
+      # Tag all telemetry with the service name
+      - DD_ENV=dev
+      - DD_SERVICE=${DD_SERVICE}
+      - DD_VERSION=0.1.0
+      - DD_LOGS_ENABLED=true
+      - DD_LOGS_CONFIG_CONTAINER_COLLECT_ALL=false
+    ports:
+      - "4317:4317"   # OTLP gRPC (traces)
+      - "4318:4318"   # OTLP HTTP (optional)
+      - "8125:8125/udp"  # StatsD (optional)
+    volumes:
+      - ./datadog/conf.d:/etc/datadog-agent/conf.d:ro
+      - ./logs:/logs:ro
+
 volumes:
   rabbitmq-data:

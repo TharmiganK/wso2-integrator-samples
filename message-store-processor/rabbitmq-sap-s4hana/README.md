@@ -72,6 +72,10 @@ The [`failed-message-console`](../failed-message-console) (the review/replay UI)
 - [Ballerina](https://ballerina.io/downloads/) `2201.13.4` (Swan Lake) or later.
 - [Docker](https://docs.docker.com/get-docker/) and Docker Compose, to run the RabbitMQ broker and the Temporal dev server (both are in `docker-compose.yml` — no separate Temporal install needed).
 - [Node.js](https://nodejs.org/) 18+, to run the [Failed Sales Order Console](../failed-message-console).
+- A [Datadog account](https://www.datadoghq.com/) and an API key (**Organization Settings →
+  API Keys**), with the **OpenMetrics** integration added (Integrations tab). The services
+  publish metrics (Prometheus) and traces (OpenTelemetry), and a Datadog Agent runs in
+  Docker alongside the broker to collect them.
 
 ## Configuration
 
@@ -116,38 +120,80 @@ enableManagementApi = true
 enableBasicAuth = false   # the console's BFF is the trust boundary
 ```
 
+### Observability
+
+Each package must enable metrics and tracing for the Datadog Agent to collect telemetry.
+`Config.toml` is **git-ignored**, so add the block below to each package's `Config.toml` —
+using **port `9797` for `sales_order_store`** and **`9798` for `sales_order_processor`** so
+the two `/metrics` endpoints don't collide:
+
+```toml
+[ballerina.observe]
+tracingEnabled = true
+tracingProvider = "jaeger"
+metricsEnabled = true
+metricsReporter = "prometheus"
+
+[ballerinax.prometheus]
+port = 9797            # sales_order_store; use 9798 for sales_order_processor
+host = "0.0.0.0"       # bind all interfaces so the Dockerised Agent can scrape via host.docker.internal
+
+[ballerinax.jaeger]
+agentHostname = "localhost"   # the Agent's OTLP port is published to the host
+agentPort = 4317
+samplerType = "const"
+samplerParam = 1.0
+reporterFlushInterval = 2000
+reporterBufferSize = 1000
+```
+
 ## Running the sample
 
-**1. Start the broker and Temporal.** From this directory:
+**1. Provide your Datadog API key.** From this directory:
+
+```bash
+cp datadog/.env.example .env
+# edit .env and set DD_API_KEY=<your-key>
+```
+
+`.env` is gitignored. `.env.example` also sets `DD_SITE` (default `datadoghq.com`) and
+`DD_SERVICE`; change `DD_SITE` in your `.env` if your account is on another site (e.g.
+`datadoghq.eu`).
+
+**2. Start the RabbitMQ broker, Temporal, and Datadog Agent.** From this directory:
 
 ```bash
 docker compose up -d
 ```
 
-This starts RabbitMQ — with the `sales-orders`, `sales-orders-dlq` and `sales-orders-res` queues already declared (loaded from `rabbitmq/definitions.json`); management UI at [http://localhost:15672](http://localhost:15672) (`guest`/`guest`) — and a single-container **Temporal** dev server that backs the durable review workflows (gRPC on `:7233`, Web UI at [http://localhost:8233](http://localhost:8233)).
+This starts RabbitMQ — with the `sales-orders`, `sales-orders-dlq` and `sales-orders-res` queues already declared (loaded from `rabbitmq/definitions.json`); management UI at [http://localhost:15672](http://localhost:15672) (`guest`/`guest`) — and a single-container **Temporal** dev server that backs the durable review workflows (gRPC on `:7233`, Web UI at [http://localhost:8233](http://localhost:8233)). The Datadog Agent starts alongside the broker; verify it picked up the OpenMetrics check and OTLP receiver:
 
-**2. Start the mock SAP endpoint.** In a new terminal:
+```bash
+docker exec demo-datadog-agent agent status | grep -A5 -iE "openmetrics|otlp|apm"
+```
+
+**3. Start the mock SAP endpoint.** In a new terminal:
 
 ```bash
 cd mock_sap_endpoint
 bal run
 ```
 
-**3. Start the processor** (its `Config.toml` enables `LOCAL` mode and the management API on `:8234`). In a new terminal:
+**4. Start the processor** (its `Config.toml` enables `LOCAL` mode and the management API on `:8234`). In a new terminal:
 
 ```bash
 cd sales_order_processor
 bal run
 ```
 
-**4. Start the store.** In a new terminal:
+**5. Start the store.** In a new terminal:
 
 ```bash
 cd sales_order_store
 bal run
 ```
 
-**5. Start the Failed Sales Order Console.** In a new terminal:
+**6. Start the Failed Sales Order Console.** In a new terminal:
 
 ```bash
 cd ../failed-message-console
@@ -193,10 +239,69 @@ You get back `202 Accepted` as soon as the order is stored. Watch the `sales_ord
 
 To watch the human-in-the-loop path clearly, set `failurePercentage = 100` in `mock_sap_endpoint/Config.toml` and restart the mock: every order fails and appears under **Failed Sales Orders** in the [console](http://localhost:5173). Open one, lower `failurePercentage` back to `0`, and **replay** it — it now succeeds and a record lands on `sales-orders-res`. To see the terminal sink, keep `failurePercentage = 100`, replay, let the replay fail, then **give up** on the resulting failed replay — the message is moved to `sales-orders-dlq`, which you can inspect in the [RabbitMQ management UI](http://localhost:15672). Posting a malformed payload instead exercises the parse-error path, where you can fix the order via **retry with new input**.
 
+## Replaying dead-lettered orders
+
+Once the root cause is fixed (e.g. set `failurePercentage = 0` and restart the mock), the orders sitting on `sales-orders-dlq` can be replayed back onto `sales-orders` **from the broker itself**, with no application change — `sales_order_processor` then reprocesses them normally.
+
+Everything is done from the [RabbitMQ management UI](http://localhost:15672):
+
+- **Shovel (recommended)** — **Admin** → **Shovel Management** → **Add a new shovel**: source queue `sales-orders-dlq`, destination queue `sales-orders`, **Delete after** `Queue length` so it drains the current backlog once and removes itself. The `rabbitmq_shovel`/`rabbitmq_shovel_management` plugins are already enabled by this sample's `docker-compose.yml`.
+- **Manual Get + Publish** — for replaying (or **editing**) one message at a time: **Get messages** on `sales-orders-dlq` with Ack Mode `Reject requeue true`, copy the payload, **Publish message** to `sales-orders`, then remove the original. Publish the replay *before* removing the original so a mistake never loses the order.
+
+See the [DLQ replay runbook](../replaying-dead-lettered-orders.md) for the full walkthrough (CLI equivalents, editing-while-replaying feasibility) and the Solace equivalent.
+
+## Viewing telemetry in Datadog
+
+With the services running and a few orders posted (see [Trying it out](#trying-it-out)), the
+Datadog Agent scrapes the services' `/metrics` endpoints on host ports `9797`/`9798` (via
+`host.docker.internal`) and receives the OTLP traces they push to `localhost:4317`.
+
+| Service | Metrics endpoint | Traces |
+|---|---|---|
+| `sales_order_store` | `http://localhost:9797/metrics` | → Agent `localhost:4317` (OTLP/gRPC) |
+| `sales_order_processor` | `http://localhost:9798/metrics` | → Agent `localhost:4317` (OTLP/gRPC) |
+
+- **Metrics** → *Metrics Explorer*: search for `ballerina.*`.
+- **APM → Traces**: filter by service (`sales_order_store`, `sales_order_processor`) to
+  inspect spans and tags.
+- **Logs → Log Explorer**: filter `source:ballerina` (and `env:dev` or a `service:`) — see
+  below to enable shipping.
+
+### Logs
+
+The services run on the host via `bal run`, so the Dockerised Agent can't grab their stdout
+directly. Instead each service writes **JSON logs to a file** under the sample-root `logs/`
+directory, and the Agent tails those files (`DD_LOGS_ENABLED=true` +
+`datadog/conf.d/ballerina.d/conf.yaml`, both already in the compose setup).
+
+To enable it, add the block below to each package's `Config.toml` — `sales_order_store`
+writes `../logs/sales_order_store.log`, `sales_order_processor` writes
+`../logs/sales_order_processor.log`:
+
+```toml
+[ballerina.log]
+format = "json"
+keyValues = { service = "sales_order_store", env = "dev" }   # service = "sales_order_processor" for the processor
+
+[[ballerina.log.destinations]]
+type = "stdout"                               # keep console output visible
+
+[[ballerina.log.destinations]]
+path = "../logs/sales_order_store.log"        # ../logs/sales_order_processor.log for the processor
+```
+
+Because `service` matches the APM service name, logs and traces correlate. Confirm the Agent
+is tailing them with:
+
+```bash
+docker exec demo-datadog-agent agent status | grep -A15 -i "logs agent"
+```
+
 ## Cleaning up
 
 ```bash
 docker compose down -v
 ```
 
-The `-v` flag also removes the broker's data volume so the next run starts from a clean state.
+The `-v` flag also removes the broker's data volume so the next run starts from a clean
+state.
