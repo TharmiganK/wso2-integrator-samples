@@ -57,7 +57,7 @@ Solace PubSub+ **Broker Manager (http://localhost:8080) does not browse, copy, o
 
 Two things to know, both different from RabbitMQ's shovel:
 
-- **`copy-message` copies, it does not move.** The original message stays on `sales-orders-dlq` (the DLQ keeps an audit copy). If you also want to clear the DLQ, delete that message afterwards with `delete-messages queue sales-orders-dlq message <msg-id>` (the numeric `msgId` from the SEMPv2 monitor, not the `replicationGroupMsgId`).
+- **`copy-message` copies, it does not move.** The original message stays on `sales-orders-dlq` (the DLQ keeps an audit copy). If you also want to clear the DLQ, delete that message afterwards with `delete-messages queue sales-orders-dlq message <msg-id>` (the numeric `msgId` from the SEMPv2 monitor, not the `replicationGroupMsgId`) — or set `DELETE_AFTER_COPY=1` when using the scripted flow below, which does this for you once every copy has succeeded.
 - **The broker CLI needs a TTY.** Commands cannot simply be piped into `docker exec -i … cli`; that prints the banner and silently ignores the input. Run it interactively (`docker exec -it`), or use the helper script below, which drives the CLI over a pseudo-terminal.
 
 `copy-message` copies a **single** message identified by its `replicationGroupMsgId`, so the flow is: discover the id(s), then copy each one.
@@ -68,10 +68,11 @@ This sample ships a helper that does both steps for every message on the DLQ:
 
 ```bash
 cd solace-sap-s4hana
-./replay-from-dlq.py
+./replay-from-dlq.py                       # copy only, keep DLQ audit copies
+DELETE_AFTER_COPY=1 ./replay-from-dlq.py   # copy, then clear the DLQ
 ```
 
-It lists the DLQ messages via the SEMPv2 monitor API and drives one `copy-message` per id into the broker CLI over a pseudo-terminal (Python 3, standard library only). Override defaults with env vars (`SRC_QUEUE`, `DST_QUEUE`, `SOLACE_CONTAINER`, …) if needed.
+It lists the DLQ messages via the SEMPv2 monitor API and drives one `copy-message` per id into the broker CLI over a pseudo-terminal (Python 3, standard library only). With `DELETE_AFTER_COPY=1`, it only deletes the originals once the copy pass comes back error-free — an order can never be lost without a confirmed copy first. Override defaults with env vars (`SRC_QUEUE`, `DST_QUEUE`, `SOLACE_CONTAINER`, …) if needed.
 
 ### Manual
 
@@ -108,7 +109,7 @@ Regardless of broker, after replaying:
 
 - The **`sales_order_processor` logs** show the order received and processed again.
 - A successful order writes a record to **`sales-orders-res`**.
-- Queue depths confirm it: `sales-orders` spikes then drains as the processor consumes it. On **RabbitMQ** the shovel *moves*, so `sales-orders-dlq` drops to 0; on **Solace** `copy-message` *copies*, so the DLQ keeps its copy until you delete it. Check depths in the [RabbitMQ Management UI](http://localhost:15672) (**Queues**) or the [Solace Broker Manager](http://localhost:8080) (**Queues** → select the queue → **Messages Queued**).
+- Queue depths confirm it: `sales-orders` spikes then drains as the processor consumes it. On **RabbitMQ** the shovel *moves*, so `sales-orders-dlq` drops to 0; on **Solace** `copy-message` *copies*, so the DLQ keeps its copy until you delete it (or ran the script with `DELETE_AFTER_COPY=1` set). Check depths in the [RabbitMQ Management UI](http://localhost:15672) (**Queues**) or the [Solace Broker Manager](http://localhost:8080) (**Queues** → select the queue → **Messages Queued**).
 
 > On Solace, the live **Messages Queued** browse is authoritative; the queue's `spooledMsgCount` summary metric can lag and read high.
 
