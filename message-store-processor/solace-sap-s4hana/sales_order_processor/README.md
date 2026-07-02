@@ -35,7 +35,7 @@ Importing `ballerina/workflow.management` auto-starts the management REST API on
 
 | File | Role |
 |---|---|
-| `main.bal` | The `StoreListener` (`maxRetries: 0`) and `onMessage`, which parses via `parseSalesOrderReq` (Solace delivers `byte[]`) and starts a review workflow on failure. `toRawJson` decodes byte payloads to readable JSON for the console. Imports `workflow.management` to expose the API. |
+| `main.bal` | The `StoreListener` (`maxRetries: 2`, `retryInterval: 2s`, with a `deadLetterStore` safety net for messages the listener itself can't hand off) and `onMessage`, which parses via `parseSalesOrderReq` (Solace delivers `byte[]`) and starts a review workflow on failure. `toRawJson` decodes byte payloads to readable JSON for the console. Imports `workflow.management` to expose the API. |
 | `workflow.bal` | The `reviewFailedSalesOrderProcess` workflow plus the `replaySalesOrder` and `deadLetterActivity` activities. Replay uses `workflow:ManualRetry`; a give-up routes to the dead-letter store. Workflow-body logs are guarded by `isReplaying()`. |
 | `functions.bal` | `processSalesOrder` (maps + calls SAP + audits) and `parseSalesOrderReq` (byte[]/JSON parsing). Reused by the replay activity. |
 | `data_mappings.bal` | Order → SAP `CreateA_SalesOrder` transforms. |
@@ -48,7 +48,8 @@ Importing `ballerina/workflow.management` auto-starts the management REST API on
 `Config.toml` holds the three store connections (Solace SMF on
 `tcp://localhost:45555`, VPN `default`, `admin`/`admin`), the queue names, and the
 SAP endpoint (the local [`mock_sap_endpoint`](../mock_sap_endpoint) on `9090`). The
-listener knobs are in `main.bal`: `pollingInterval` (10s) and `maxRetries` (`0`).
+listener knobs are in `main.bal`: `pollingInterval` (10s), `maxRetries` (`2`) /
+`retryInterval` (2s), and a `deadLetterStore`.
 
 The same `Config.toml` also wires the review workflow to Temporal:
 

@@ -103,7 +103,7 @@ password = "admin"
 # deadLetterStoreConfig and salesOrderResStoreConfig follow the same shape.
 ```
 
-Note the SMF port `45555`: the Solace default is `55555`, but that falls inside the macOS ephemeral port range, so `docker-compose.yml` remaps it to `45555` on the host. The store and listener tuning knobs (`pollingInterval`, `maxRetries` — `0`, since in-place retry is disabled in favour of the review workflow) are set in code in `sales_order_processor/main.bal`. The mock SAP endpoint always returns success; to push an order into the review workflow, stop it so the processor's create call cannot reach SAP (see [Trying it out](#trying-it-out)).
+Note the SMF port `45555`: the Solace default is `55555`, but that falls inside the macOS ephemeral port range, so `docker-compose.yml` remaps it to `45555` on the host. The store and listener tuning knobs (`pollingInterval`, `maxRetries` (`2`) / `retryInterval` (2s), and a `deadLetterStore` that catches a message only if the listener itself can't hand it off to the review workflow — parse and processing failures are handled by starting that workflow, not by in-place retry) are set in code in `sales_order_processor/main.bal`. The mock SAP endpoint always returns success; to push an order into the review workflow, stop it so the processor's create call cannot reach SAP (see [Trying it out](#trying-it-out)).
 
 The review workflow needs the management API backed by a real server, so `sales_order_processor/Config.toml` also selects `LOCAL` workflow mode against the Temporal dev server and enables the management API:
 
