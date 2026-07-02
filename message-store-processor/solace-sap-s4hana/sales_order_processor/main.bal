@@ -10,14 +10,15 @@ import ballerina/workflow.management as _;
 import ballerinax/prometheus as _;
 import ballerinax/jaeger as _;
 
-# Polls the sales-order store and drives each message through processing. Instead of
-# the listener's in-place retry / dead-letter behaviour, a message that fails to
-# process or parse is handed to a durable human-review workflow so a manager can
-# inspect and replay it from the console. The dead-letter store is written only when
-# the manager gives up on a message (see `workflow.bal`).
+# Polls the sales-order store and drives each message through processing. Transient
+# failures are retried (`maxRetries` times, `retryInterval` seconds apart) and a
+# message that still fails is moved to the dead-letter store, giving the pattern its
+# guaranteed-delivery behaviour.
 listener messaging:StoreListener msgStoreListener = new (salesOrderStore, {
     pollingInterval: 10,
-    maxRetries: 0
+    maxRetries: 2,
+    retryInterval: 2,
+    deadLetterStore: deadLetterStore
 });
 
 service on msgStoreListener {
