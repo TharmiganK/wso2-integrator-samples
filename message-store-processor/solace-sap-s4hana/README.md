@@ -47,7 +47,7 @@ A message flows like this: the HTTP client posts a sales order; `sales_order_sto
 ```
 solace-sap-s4hana/
 ├── Ballerina.toml             # Workspace tying the four packages together
-├── docker-compose.yml         # Solace broker + one-shot queue provisioning job + message utility UI
+├── docker-compose.yml         # Solace broker + queue provisioning + message utility UI + Temporal + Failed Sales Order Console
 ├── resources/                 # TLS cert/key used by the mock SAP HTTPS endpoint
 ├── solace/                    # Reusable messaging:Store implementation over Solace
 ├── sales_order_store/         # HTTP API → stores orders on the broker
@@ -165,7 +165,7 @@ cp datadog/.env.example .env
 docker compose up -d
 ```
 
-This starts Solace PubSub+ and runs a one-shot `solace-init` container that provisions the `sales-orders`, `sales-orders-dlq` and `sales-orders-res` queues via the SEMP API once the broker is healthy, and starts the [`solace-msg-utility`](https://github.com/SolaceLabs/solace-msg-utility) browser UI for browsing/copying/moving queued messages (a one-shot `solace-msg-utility-init` job first downloads the UI's `solclient.js`/`jszip.min.js` vendor scripts, which the published image does not bundle). It also starts a single-container **Temporal** dev server that backs the durable review workflows (gRPC on `:7233`, Web UI at [http://localhost:8233](http://localhost:8233)). The SEMP management UI is at [http://localhost:8080](http://localhost:8080) (`admin`/`admin`); the message utility UI is at [https://localhost:9444](https://localhost:9444) (self-signed cert — accept the browser warning). The broker can take up to a minute to become healthy on first start. See [replaying dead-lettered orders](../replaying-dead-lettered-orders.md) for using the UI to replay the DLQ. The Datadog Agent starts alongside the broker; verify it picked up the OpenMetrics check and OTLP receiver:
+This starts Solace PubSub+ and runs a one-shot `solace-init` container that provisions the `sales-orders`, `sales-orders-dlq` and `sales-orders-res` queues via the SEMP API once the broker is healthy, and starts the [`solace-msg-utility`](https://github.com/SolaceLabs/solace-msg-utility) browser UI for browsing/copying/moving queued messages (a one-shot `solace-msg-utility-init` job first downloads the UI's `solclient.js`/`jszip.min.js` vendor scripts, which the published image does not bundle). It also starts a single-container **Temporal** dev server that backs the durable review workflows (gRPC on `:7233`, Web UI at [http://localhost:8233](http://localhost:8233)). The SEMP management UI is at [http://localhost:8080](http://localhost:8080) (`admin`/`admin`); the message utility UI is at [https://localhost:9444](https://localhost:9444) (self-signed cert — accept the browser warning). The broker can take up to a minute to become healthy on first start. See [replaying dead-lettered orders](../replaying-dead-lettered-orders.md) for using the UI to replay the DLQ. It also starts the [Failed Sales Order Console](../failed-message-console) (the review/replay UI plus its BFF) in a Node container — UI at [http://localhost:5173](http://localhost:5173), BFF on `:3001`, proxying to the host-run processor's management API via `host.docker.internal:8234`. The Datadog Agent starts alongside the broker; verify it picked up the OpenMetrics check and OTLP receiver:
 
 ```bash
 docker exec demo-datadog-agent agent status | grep -A5 -iE "openmetrics|otlp|apm"
@@ -192,15 +192,20 @@ cd sales_order_store
 bal run
 ```
 
-**6. Start the Failed Sales Order Console.** In a new terminal:
+**6. Open the Failed Sales Order Console.** `docker compose up -d` (step 1) already
+started it in a Node container — its BFF (`:3001`) and UI (`:5173`) come up
+alongside the broker, and its BFF reaches the host-run processor's management API
+via `host.docker.internal:8234`. Just open [http://localhost:5173](http://localhost:5173)
+and sign in as `manager` / `manager123`.
+
+To run it by hand instead (e.g. for UI development with faster reloads), stop the
+container (`docker compose stop failed-message-console`) and start it locally:
 
 ```bash
 cd ../failed-message-console
 npm install
 npm run dev      # BFF on :3001, UI on :5173
 ```
-
-Open [http://localhost:5173](http://localhost:5173) and sign in as `manager` / `manager123`.
 
 ## Trying it out
 

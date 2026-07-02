@@ -95,6 +95,38 @@ services:
       - "7233:7233"   # gRPC frontend (used by the workflow runtime in LOCAL mode)
       - "8233:8233"   # Temporal Web UI -> http://localhost:8233
 
+  # Failed Sales Order Console — the human-review UI (Vite + React) and its BFF
+  # (server/index.mjs), which previously had to be started by hand with
+  # `npm run dev`. This service runs both in a Node container so a single
+  # `docker compose up` brings the review front end up alongside the broker.
+  #
+  # The console is the sibling project shared by both broker variants, mounted
+  # from ../failed-message-console. Its BFF proxies /api/wf/* to the processor's
+  # ballerina/workflow.management API, which runs on the HOST (`bal run`, :8234) —
+  # hence host.docker.internal below (same as datadog-agent), NOT a compose
+  # service. node_modules lives in a named volume so the host's macOS-built
+  # modules never shadow the Linux install inside the container.
+  failed-message-console:
+    image: node:20-alpine
+    container_name: demo-failed-message-console
+    working_dir: /app
+    # Mirror the package.json "dev" script (concurrently server + web) but add
+    # --host so Vite binds 0.0.0.0 and is reachable through the published port.
+    command:
+      - sh
+      - -c
+      - npm install && npx concurrently -n server,web -c blue,green "node server/index.mjs" "vite --host"
+    environment:
+      # The BFF's default MGMT_URL is localhost:8234; from inside the container the
+      # host-run processor is reached via host.docker.internal.
+      - MGMT_URL=http://host.docker.internal:8234/workflow
+    ports:
+      - "3001:3001"   # BFF (Express)
+      - "5173:5173"   # Vite dev server / UI -> http://localhost:5173
+    volumes:
+      - ../failed-message-console:/app
+      - console-node-modules:/app/node_modules
+
   # Browser UI for browsing/copying/moving queued messages (e.g. replaying
   # sales-orders-dlq back onto sales-orders) without the broker CLI.
   # https://github.com/SolaceLabs/solace-msg-utility
@@ -194,3 +226,4 @@ volumes:
   solace-data:
   solace-msg-utility-tls:
   solace-msg-utility-vendor:
+  console-node-modules:
