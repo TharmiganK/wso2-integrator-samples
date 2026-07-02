@@ -69,10 +69,16 @@ public type FailedSalesOrderReview record {|
 |};
 
 # Decision captured from the reviewing manager and delivered back to the workflow via
-# the management API's `completeHumanTask`. Drives the auto-generated completion form.
-public type SalesOrderReviewDecision record {|
+# the management API. Only the two declared fields drive the auto-generated completion
+# form used by the console's "replay" action. The record is intentionally **open** (and
+# deliberately declares no extra fields): the console's "Discard to DLQ" action fails the
+# task, which the management API delivers as a rejection *result*
+# (`{approved: false, __rejected: true, reason}`) rather than an error. Those fields must
+# bind somewhere for the workflow to detect the discard, so they land in the rest fields
+# and are read by key (`decision["approved"]`) instead of adding form inputs to replay.
+public type SalesOrderReviewDecision record {
     # An optional corrected order to replay instead of the original payload
     SalesOrderRequest? editedPayload = ();
     # Optional free-text reviewer comments
     string? comments = ();
-|};
+};

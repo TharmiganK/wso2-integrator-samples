@@ -6,9 +6,10 @@ import ballerina/workflow;
 # It surfaces the failure to a manager as a human task and blocks at `awaitHumanTask`
 # until the manager acts. Completing the task replays the order through SAP as a
 # durable activity with a `workflow:ManualRetry` policy, so a replay that fails again
-# resurfaces in the console as a manual retry-task. Failing the task (or letting it
-# time out) discards the message to the dead-letter store, as does a manager who gives
-# up on the manual retry-task.
+# resurfaces in the console as a manual retry-task. Discarding the task (the console's
+# "Discard to DLQ" action, which the management API delivers as a rejection decision
+# with `approved == false`) — or letting it time out — moves the message to the
+# dead-letter store, as does a manager who gives up on the manual retry-task.
 #
 # + ctx - The durable workflow context
 # + input - The failed order, its raw payload, and the failure details
@@ -36,8 +37,11 @@ function reviewFailedSalesOrderProcess(workflow:Context ctx, FailedSalesOrderRev
         orderPayload: input.rawPayload
     };
 
-    // Completing the task means "replay"; failing it (the console's "Fail task"
-    // action) — or a timeout — surfaces as an error here and discards the message.
+    // Completing the task means "replay". The console's "Discard to DLQ" action *fails*
+    // the task, which the management API delivers as a rejection result (not an error):
+    // `awaitHumanTask` returns a decision with `approved == false`. It only returns an
+    // error on a timeout (or a cancel), so both the rejection and the timeout have to be
+    // handled to move a discarded message to the dead-letter store.
     logStep(ctx, "awaiting manager review", {workflowId, refId});
     SalesOrderReviewDecision|error decision = ctx->awaitHumanTask(
         "reviewFailedSalesOrder",
@@ -47,9 +51,17 @@ function reviewFailedSalesOrderProcess(workflow:Context ctx, FailedSalesOrderRev
         description = input.errorMessage
     );
     if decision is error {
-        // Manager rejected the review task (or it timed out) — discard to the DLQ.
-        logStep(ctx, "review rejected; moving message to the dead-letter store",
+        // The review task timed out (or was cancelled) — discard to the DLQ.
+        logStep(ctx, "review task ended without a decision; moving message to the dead-letter store",
                 {workflowId, refId, cause: decision.message()});
+        _ = check ctx->callActivity(deadLetterActivity, {payload: input.rawPayload}, string);
+        return "DISCARDED";
+    }
+    if decision["approved"] == false {
+        // Manager discarded the order via the console's "Discard to DLQ" action. The
+        // rejection markers arrive in the open record's rest fields, not the replay form.
+        logStep(ctx, "review rejected by manager; moving message to the dead-letter store",
+                {workflowId, refId, cause: (decision["reason"] ?: "").toString()});
         _ = check ctx->callActivity(deadLetterActivity, {payload: input.rawPayload}, string);
         return "DISCARDED";
     }
