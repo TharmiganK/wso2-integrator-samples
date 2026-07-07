@@ -1,40 +1,44 @@
-# Configuration for the sales_order_store package.
-# Connects to the Solace broker defined in ../docker-compose.yml.
-
 salesOrderQueueName = "sales-orders"
 
 [salesOrderStoreConfig]
 url = "tcp://localhost:45555"
 messageVpn = "default"
 
-[salesOrderStoreConfig.auth]
-username = "admin"
-password = "admin"
+  [salesOrderStoreConfig.auth]
+  username = "admin"
+  password = "admin"
 
 [ballerina.observe]
 tracingEnabled = true
 tracingProvider = "jaeger"
 metricsEnabled = true
 metricsReporter = "prometheus"
+metricsLogsEnabled = true
+
+[ballerina.log]
+format = "logfmt"
+
+  [ballerina.log.keyValues]
+  service = "sales_order_store"
+  env = "dev"
+
+  [[ballerina.log.destinations]]
+  type = "stdout"
+
+  [[ballerina.log.destinations]]
+  path = "../logs/sales_order_store/app.log"
 
 [ballerinax.prometheus]
-port = 9797
+port = 9_797
 host = "0.0.0.0"
 
 [ballerinax.jaeger]
 agentHostname = "localhost"
 agentPort = 4317
 samplerType = "const"
-samplerParam = 1.0
-reporterFlushInterval = 2000
-reporterBufferSize = 1000
+samplerParam = 1
+reporterFlushInterval = 2_000
+reporterBufferSize = 1_000
 
-[ballerina.log]
-format = "json"
-keyValues = { service = "sales_order_store", env = "dev" }
-
-[[ballerina.log.destinations]]
-type = "stdout"
-
-[[ballerina.log.destinations]]
-path = "../logs/sales_order_store.log"
+[ballerinax.metrics.logs]
+logFilePath = "../logs/sales_order_store/metrics.log"

@@ -1,17 +1,24 @@
 # Datadog log source. Mounted into the Agent container at
 # /etc/datadog-agent/conf.d/ballerina.d/conf.yaml by ../docker-compose.yml, which also
-# mounts the host `logs/` dir to /var/log/ballerina and sets DD_LOGS_ENABLED=true.
+# mounts the host `logs/` dir to /logs and sets DD_LOGS_ENABLED=true.
 #
-# The Ballerina services (run on the host via `bal run`) write JSON logs to
-# ../logs/<service>.log; the Agent tails them from the bind mount. `service` matches the
-# APM service name so logs and traces correlate; `source: ballerina` drives log parsing.
+# The Ballerina services (run on the host via `bal run`) write logfmt logs to
+# ../logs/<service>/app.log; the Agent tails them from the bind mount. The same file is
+# also tailed by Fluent Bit (see ../../fluent-bit) for the ICP observability pipeline, so
+# the path is shared between the two consumers rather than duplicated. `service` matches
+# the APM service name so logs and traces correlate; `source: ballerina` drives log parsing.
+#
+# Note: logs are logfmt, not JSON (required by ICP's Fluent Bit parser — Ballerina's log
+# format is a single global setting, so it can't be JSON for Datadog and logfmt for ICP at
+# the same time). Datadog still tails and indexes these lines fine as plain text; it just
+# no longer auto-extracts top-level JSON attributes as facets.
 logs:
   - type: file
-    path: /logs/sales_order_store.log
+    path: /logs/sales_order_store/app.log
     service: sales_order_store
     source: ballerina
 
   - type: file
-    path: /logs/sales_order_processor.log
+    path: /logs/sales_order_processor/app.log
     service: sales_order_processor
     source: ballerina

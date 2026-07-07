@@ -41,6 +41,7 @@ tracingEnabled = true
 tracingProvider = "jaeger"
 metricsEnabled = true
 metricsReporter = "prometheus"
+metricsLogsEnabled = true
 
 [ballerinax.prometheus]
 port = 9798
@@ -55,11 +56,14 @@ reporterFlushInterval = 2000
 reporterBufferSize = 1000
 
 [ballerina.log]
-format = "json"
+format = "logfmt"
 keyValues = { service = "sales_order_processor", env = "dev" }
 
 [[ballerina.log.destinations]]
 type = "stdout"
 
 [[ballerina.log.destinations]]
-path = "../logs/sales_order_processor.log"
+path = "../logs/sales_order_processor/app.log"
+
+[ballerinax.metrics.logs]
+logFilePath = "../logs/sales_order_processor/metrics.log"

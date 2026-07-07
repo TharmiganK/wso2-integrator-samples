@@ -18,7 +18,9 @@ Thumbs.db
 # Committed as datadog/.env.example; the real key goes in datadog/.env (or .env).
 .env
 
-# Ballerina log files shipped to Datadog (the logs/ dir itself is kept via .gitkeep).
-# `**/` so it matches the nested per-sample logs/ dirs, not just a repo-root one.
-**/logs/*.log
+# Ballerina log files shipped to Datadog and to the ICP Fluent Bit pipeline (the logs/
+# dir itself is kept via .gitkeep). `**/` so it matches the nested per-sample logs/ dirs,
+# not just a repo-root one; the trailing `**/` also covers the per-package app.log /
+# metrics.log subdirectories used by the ICP observability setup.
+**/logs/**/*.log
 

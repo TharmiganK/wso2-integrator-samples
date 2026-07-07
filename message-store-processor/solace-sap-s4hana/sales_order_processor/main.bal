@@ -1,10 +1,13 @@
-import ballerina/messaging;
 import ballerina/log;
+import ballerina/messaging;
+import ballerinax/jaeger as _;
+import ballerinax/metrics.logs as _;
 
 // Observability: expose Prometheus metrics on /metrics and push OpenTelemetry
 // traces to the Datadog Agent's OTLP receiver. See ../datadog and Config.toml.
 import ballerinax/prometheus as _;
-import ballerinax/jaeger as _;
+
+import wso2/icp.runtime.bridge as _;
 
 # Polls the sales-order store and drives each message through processing. Transient
 # failures are retried (`maxRetries` times, `retryInterval` seconds apart) and a

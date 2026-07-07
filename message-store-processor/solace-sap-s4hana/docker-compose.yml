@@ -179,7 +179,105 @@ services:
       - ./datadog/conf.d:/etc/datadog-agent/conf.d:ro
       - ./logs:/logs:ro
 
+  # OpenSearch for the ICP observability pipeline: Fluent Bit ships the Ballerina
+  # services' app.log/metrics.log into it, and the ICP server (running natively, see
+  # docs: manage/icp/install-icp.md) queries it for the console's Logs and Metrics
+  # pages. Security plugin enabled (the image's bundled demo TLS certs + an admin
+  # password) so this isn't wide-open on localhost:9200 - see the doc's Security notes
+  # section before using credentials/certs other than the demo ones in this file.
+  opensearch:
+    image: opensearchproject/opensearch:latest
+    container_name: demo-opensearch
+    environment:
+      - discovery.type=single-node
+      - OPENSEARCH_INITIAL_ADMIN_PASSWORD=${OPENSEARCH_PASSWORD:-YourStrong@Pass2026}
+      - "OPENSEARCH_JAVA_OPTS=-Xms512m -Xmx512m"
+    ports:
+      - "9200:9200"   # REST API (HTTPS, self-signed demo cert) -> ICP's deployment.toml opensearchUrl
+    volumes:
+      - opensearch-data:/usr/share/opensearch/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sfk -u admin:${OPENSEARCH_PASSWORD:-YourStrong@Pass2026} https://localhost:9200/_cluster/health >/dev/null || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 60s
+
+  # One-shot: creates the two OpenSearch index templates the ICP observability pipeline
+  # needs (application logs + metrics logs), then exits. See
+  # docs: manage/icp/observability-setup.md ("Create index templates").
+  opensearch-init:
+    image: curlimages/curl:latest
+    container_name: demo-opensearch-init
+    environment:
+      - OPENSEARCH_PASSWORD=${OPENSEARCH_PASSWORD:-YourStrong@Pass2026}
+    depends_on:
+      opensearch:
+        condition: service_healthy
+    entrypoint:
+      - sh
+      - -c
+      - |
+        set -eu
+        OS="https://opensearch:9200"
+        AUTH="admin:$$OPENSEARCH_PASSWORD"
+
+        echo "Creating application log index template..."
+        curl -sfk -u "$$AUTH" -X PUT "$$OS/_index_template/wso2_integration_application_log_template" \
+          -H "Content-Type: application/json" \
+          -d '{
+            "index_patterns": ["ballerina-application-logs-*"],
+            "template": {
+              "mappings": {
+                "properties": {
+                  "time":          { "type": "date", "format": "yyyy-MM-dd'\''T'\''HH:mm:ss.SSS'\''Z'\''||strict_date_optional_time||epoch_millis" },
+                  "message":       { "type": "text" },
+                  "icp_runtimeId": { "type": "keyword" }
+                }
+              }
+            }
+          }'
+        echo
+
+        echo "Creating metrics log index template..."
+        curl -sfk -u "$$AUTH" -X PUT "$$OS/_index_template/wso2_integration_metrics_log_template" \
+          -H "Content-Type: application/json" \
+          -d '{
+            "index_patterns": ["ballerina-metrics-logs-*"],
+            "template": {
+              "mappings": {
+                "properties": {
+                  "time":                  { "type": "date", "format": "yyyy-MM-dd'\''T'\''HH:mm:ss.SSS'\''Z'\''||strict_date_optional_time||epoch_millis" },
+                  "message":               { "type": "text" },
+                  "response_time_seconds": { "type": "float" },
+                  "response_time":         { "type": "long" }
+                }
+              }
+            }
+          }'
+        echo
+
+        echo "OpenSearch index templates ready."
+
+  # Tails ../logs/<package>/{app,metrics}.log (written by each package's Config.toml)
+  # and ships them to OpenSearch, enriched via ./fluent-bit/scripts/scripts.lua. See
+  # ./fluent-bit and docs: manage/icp/observability-setup.md.
+  fluent-bit:
+    image: fluent/fluent-bit:latest
+    container_name: demo-fluent-bit
+    environment:
+      - OPENSEARCH_PASSWORD=${OPENSEARCH_PASSWORD:-YourStrong@Pass2026}
+    depends_on:
+      opensearch-init:
+        condition: service_completed_successfully
+    volumes:
+      - ./fluent-bit/fluent-bit.conf:/fluent-bit/etc/fluent-bit.conf:ro
+      - ./fluent-bit/parsers.conf:/fluent-bit/etc/parsers.conf:ro
+      - ./fluent-bit/scripts:/fluent-bit/etc/scripts:ro
+      - ./logs:/var/log/ballerina:ro
+
 volumes:
   solace-data:
   solace-msg-utility-tls:
   solace-msg-utility-vendor:
+  opensearch-data:

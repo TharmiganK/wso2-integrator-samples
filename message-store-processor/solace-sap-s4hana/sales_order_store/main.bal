@@ -1,10 +1,13 @@
 import ballerina/http;
 import ballerina/log;
+import ballerinax/jaeger as _;
+import ballerinax/metrics.logs as _;
 
 // Observability: expose Prometheus metrics on /metrics and push OpenTelemetry
 // traces to the Datadog Agent's OTLP receiver. See ../datadog and Config.toml.
 import ballerinax/prometheus as _;
-import ballerinax/jaeger as _;
+
+import wso2/icp.runtime.bridge as _;
 
 # HTTP API that accepts sales orders and hands them to the message store for
 # asynchronous, guaranteed processing. This is the entry point of the integration:
@@ -17,7 +20,7 @@ service /api on new http:Listener(9091) {
     #
     # + salesOrder - The sales order to accept
     # + return - `202 Accepted` once the order is stored, or an `InternalError` if it
-    #            could not be stored on the broker
+    # could not be stored on the broker
     resource function post sales\-order(@http:Payload SalesOrderRequest salesOrder) returns http:Accepted|InternalError {
         do {
             check salesOrderStore->store(salesOrder);
