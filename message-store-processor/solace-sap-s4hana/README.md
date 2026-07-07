@@ -68,6 +68,9 @@ solace-sap-s4hana/
   API Keys**), with the **OpenMetrics** integration added (Integrations tab). The services
   publish metrics (Prometheus) and traces (OpenTelemetry), and a Datadog Agent runs in
   Docker alongside the broker to collect them.
+- Optional: a running [ICP](https://wso2.com/integration-platform/monitoring-and-management/)
+  server, to monitor and manage the runtimes and view their logs/metrics from the ICP
+  console. See [Viewing observability in ICP](#viewing-observability-in-icp).
 
 ## Configuration
 
@@ -237,24 +240,26 @@ Datadog Agent scrapes the services' `/metrics` endpoints on host ports `9797`/`9
 ### Logs
 
 The services run on the host via `bal run`, so the Dockerised Agent can't grab their stdout
-directly. Instead each service writes **JSON logs to a file** under the sample-root `logs/`
+directly. Instead each service writes **logfmt logs to a file** under the sample-root `logs/`
 directory, and the Agent tails those files (`DD_LOGS_ENABLED=true` +
-`datadog/conf.d/ballerina.d/conf.yaml`, both already in the compose setup).
+`datadog/conf.d/ballerina.d/conf.yaml`, both already in the compose setup). The same file is
+also tailed by Fluent Bit for the [ICP observability pipeline](#viewing-observability-in-icp),
+so there is one log file per service rather than a separate one per consumer.
 
 To enable it, add the block below to each package's `Config.toml` — `sales_order_store`
-writes `../logs/sales_order_store.log`, `sales_order_processor` writes
-`../logs/sales_order_processor.log`:
+writes `../logs/sales_order_store/app.log`, `sales_order_processor` writes
+`../logs/sales_order_processor/app.log`:
 
 ```toml
 [ballerina.log]
-format = "json"
+format = "logfmt"
 keyValues = { service = "sales_order_store", env = "dev" }   # service = "sales_order_processor" for the processor
 
 [[ballerina.log.destinations]]
-type = "stdout"                               # keep console output visible
+type = "stdout"                                     # keep console output visible
 
 [[ballerina.log.destinations]]
-path = "../logs/sales_order_store.log"        # ../logs/sales_order_processor.log for the processor
+path = "../logs/sales_order_store/app.log"          # ../logs/sales_order_processor/app.log for the processor
 ```
 
 Because `service` matches the APM service name, logs and traces correlate. Confirm the Agent
@@ -263,6 +268,88 @@ is tailing them with:
 ```bash
 docker exec demo-datadog-agent agent status | grep -A15 -i "logs agent"
 ```
+
+> **Note:** The format is `logfmt`, not JSON. Ballerina's log format is a single global
+> setting, so it can't be JSON for Datadog and `logfmt` for ICP's Fluent Bit parser at the
+> same time — see [Viewing observability in ICP](#viewing-observability-in-icp) for why ICP
+> needs `logfmt`. Datadog still tails and indexes these lines fine as plain text; it just
+> no longer auto-extracts top-level JSON attributes as facets.
+
+## Viewing observability in ICP
+
+Both `sales_order_store` and `sales_order_processor` are already wired up to connect to a
+[WSO2 Integrator: ICP](https://wso2.com/integration-platform/monitoring-and-management/)
+server as runtimes — `Ballerina.toml` sets `remoteManagement`/`observabilityIncluded`,
+`main.bal` imports `wso2/icp.runtime.bridge` and `ballerinax/metrics.logs`, and each
+`Config.toml` needs a `[wso2.icp.runtime.bridge]` block with a secret generated from the
+ICP console ("Connect an integration to ICP" in the ICP docs — not part of this sample,
+since the secret is unique per ICP installation).
+
+ICP itself runs natively (`./bin/icp.sh`), not in this `docker-compose.yml` — see the
+"Install ICP" doc. This sample's compose file provides the observability *backend* ICP
+needs to show the **Logs**
+and **Metrics** pages: OpenSearch, plus Fluent Bit to ship the services' log files into it.
+
+### 1. Enable per-request metrics logging
+
+Add to each package's `Config.toml`, alongside the `[ballerina.observe]` block from
+[Observability](#observability):
+
+```toml
+[ballerina.observe]
+metricsLogsEnabled = true
+
+[ballerinax.metrics.logs]
+logFilePath = "../logs/sales_order_store/metrics.log"   # ../logs/sales_order_processor/metrics.log for the processor
+```
+
+This is in addition to the `format = "logfmt"` / `path = "../logs/<service>/app.log"`
+settings already shown under [Logs](#logs) — Fluent Bit tails both `app.log` (application
+logs) and `metrics.log` (per-request metrics) for each service.
+
+### 2. Start OpenSearch and Fluent Bit
+
+Already part of `docker compose up -d` (see [Running the sample](#running-the-sample)):
+`opensearch` (single-node, security plugin **enabled** — HTTPS on 9200 with the image's
+bundled self-signed demo cert and an `admin` password), a one-shot `opensearch-init` job
+that creates the two index templates ICP's dashboards expect, and `fluent-bit` (config in
+[`fluent-bit/`](./fluent-bit)), which tails `../logs/<service>/{app,metrics}.log` and ships
+enriched records to OpenSearch over HTTPS.
+
+The demo admin password defaults to `YourStrong@Pass2026` (matches the password ICP itself
+suggests as a placeholder in `deployment.toml`). Override it by setting `OPENSEARCH_PASSWORD`
+in `.env` — it's picked up by the `opensearch`, `opensearch-init`, and `fluent-bit` services.
+
+Verify OpenSearch received data once the services have handled some traffic (see
+[Trying it out](#trying-it-out)):
+
+```bash
+curl -sk -u admin:YourStrong@Pass2026 'https://localhost:9200/_cat/indices/ballerina-*?v'
+```
+
+You should see `ballerina-application-logs-*` and `ballerina-metrics-logs-*` indices with a
+non-zero `docs.count`.
+
+### 3. Point the ICP server at OpenSearch
+
+On the machine running the ICP server, add to `conf/deployment.toml` (before the first
+`[section]` header) and restart ICP:
+
+```toml
+opensearchUrl      = "https://localhost:9200"
+opensearchUsername = "admin"
+opensearchPassword = "YourStrong@Pass2026"   # or your OPENSEARCH_PASSWORD override
+```
+
+The demo cert is self-signed; ICP's OpenSearch adapter connects to it without needing a
+separate trust-store entry. Use a properly signed cert and non-default credentials before
+using this setup beyond local evaluation.
+
+### 4. Check the ICP console
+
+Sign in at `https://<icp-host>:9446`, open **Projects** > **default-project** >
+**Integrations** > **Sales Order Store** / **Sales Order Processor**, and check
+**Runtimes** (should show status **RUNNING**), **Logs**, and **Metrics**.
 
 ## Cleaning up
 

@@ -10,6 +10,10 @@ generated/
 # See https://ballerina.io/learn/provide-values-to-configurable-variables/ for more details.
 Config.toml
 
+# Local runtime identity persisted by wso2/icp.runtime.bridge (a stable UUID used to tag
+# this runtime's logs/heartbeats). Machine-generated, not meant to be shared.
+.icp_runtime_id
+
 # File used to enable development-time tracing.
 # This should not be committed to version control.
 trace_enabled.bal

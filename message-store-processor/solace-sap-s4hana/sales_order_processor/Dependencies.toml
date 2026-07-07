@@ -333,6 +333,18 @@ modules = [
 
 [[package]]
 org = "ballerinax"
+name = "metrics.logs"
+version = "1.1.0"
+dependencies = [
+	{org = "ballerina", name = "log"},
+	{org = "ballerinai", name = "observe"}
+]
+modules = [
+	{org = "ballerinax", packageName = "metrics.logs", moduleName = "metrics.logs"}
+]
+
+[[package]]
+org = "ballerinax"
 name = "prometheus"
 version = "1.0.0"
 dependencies = [
@@ -385,6 +397,28 @@ dependencies = [
 
 [[package]]
 org = "wso2"
+name = "icp.runtime.bridge"
+version = "0.1.9"
+dependencies = [
+	{org = "ballerina", name = "crypto"},
+	{org = "ballerina", name = "file"},
+	{org = "ballerina", name = "http"},
+	{org = "ballerina", name = "io"},
+	{org = "ballerina", name = "jballerina.java"},
+	{org = "ballerina", name = "jwt"},
+	{org = "ballerina", name = "lang.runtime"},
+	{org = "ballerina", name = "log"},
+	{org = "ballerina", name = "observe"},
+	{org = "ballerina", name = "task"},
+	{org = "ballerina", name = "time"},
+	{org = "ballerina", name = "uuid"}
+]
+modules = [
+	{org = "wso2", packageName = "icp.runtime.bridge", moduleName = "icp.runtime.bridge"}
+]
+
+[[package]]
+org = "wso2"
 name = "sales_order_processor"
 version = "0.1.0"
 dependencies = [
@@ -392,8 +426,10 @@ dependencies = [
 	{org = "ballerina", name = "messaging"},
 	{org = "ballerinai", name = "observe"},
 	{org = "ballerinax", name = "jaeger"},
+	{org = "ballerinax", name = "metrics.logs"},
 	{org = "ballerinax", name = "prometheus"},
 	{org = "ballerinax", name = "sap.s4hana.api_sales_order_srv"},
+	{org = "wso2", name = "icp.runtime.bridge"},
 	{org = "wso2", name = "solace"}
 ]
 modules = [
