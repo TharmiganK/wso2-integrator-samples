@@ -17,7 +17,7 @@ final salesOrder:Client sapSalesOrderClient = check new ({
         password: sapS4hanaPassword
     },
     secureSocket: {
-        cert: "../resources/public.crt"
+        cert: certFile
     }
 }, sapS4hanaHostName, sapS4hanaPort);
 

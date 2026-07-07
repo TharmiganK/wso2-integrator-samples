@@ -26,8 +26,8 @@ configurable int failurePercentage = 30;
 listener http:Listener securedEP = new (9090,
     secureSocket = {
         key: {
-            certFile: "../resources/public.crt",
-            keyFile: "../resources/private.key"
+            certFile: certFile,
+            keyFile: keyFile
         }
     }
 );

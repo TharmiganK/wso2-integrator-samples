@@ -13,3 +13,6 @@ configurable string sapS4hanaUserName = ?;
 configurable string sapS4hanaPassword = ?;
 configurable string sapS4hanaHostName = ?;
 configurable int sapS4hanaPort = 443;
+
+# Path to the TLS certificate file used to trust the mock SAP endpoint.
+configurable string certFile = "../resources/public.crt";
